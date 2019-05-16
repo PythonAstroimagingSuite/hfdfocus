@@ -1,4 +1,5 @@
 import sys
+import time
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,33 +28,33 @@ else:
 
 
 
-def connect_camera(self):
+def connect_camera():
     if BACKEND == 'ASCOM':
         driver = 'MaximDL'
-        self.cam = MaximDL_Camera()
+        cam = MaximDL_Camera()
     elif BACKEND == 'INDI':
         driver = 'INDICamera'
-        self.cam = INDI_Camera(self.backend)
+        cam = INDI_Camera(self.backend)
 
     logging.info(f'connect_camera: driver = {driver}')
 
-    rc = False
+    rc = None
     if driver == 'INDICamera':
         if ':' in self.settings.camera_driver:
             indi_cam_driver = self.settings.camera_driver.split(':')[1]
             rc = self.cam.connect(indi_cam_driver)
         else:
             logging.error('connect_camera(): Must configure INDI camera driver first!')
-            return False
+            return None
     else:
-        rc = self.cam.connect(driver)
+        rc = cam.connect(driver)
 
 
 
     if not rc:
         logging.error('connect_camera(): Unable to connect to camera!')
-        return False
-    return True
+        return None
+    return cam
 
 
 if __name__ == '__main__':
@@ -70,3 +71,34 @@ if __name__ == '__main__':
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
     log.addHandler(ch)
+
+    # connect camera
+    cam = connect_camera()
+    logging.info(f'cam = {cam}')
+
+    # take exposure
+
+
+
+    focus_expos = 1
+
+    # reset frame to full sensor
+    cam.set_binning(1, 1)
+    width, height = cam.get_size()
+    cam.set_frame(0, 0, width, height)
+    cam.start_exposure(focus_expos)
+
+    # give things time to happen (?) I get Maxim not ready errors so slowing it down
+    time.sleep(0.25)
+
+    elapsed = 0
+    while not cam.check_exposure():
+        logging(f"Taking image with camera {elapsed} of {focus_expos} seconds")
+        time.sleep(0.5)
+        elapsed += 0.5
+        if elapsed > focus_expos:
+            elapsed = focus_expos
+
+    logging.info('Exposure complete')
+    # give it some time seems like Maxim isnt ready if we hit it too fast
+    time.sleep(0.5)
