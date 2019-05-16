@@ -658,7 +658,7 @@ def find_star_limits(profile, thres=0):
     return left, right
 
 # find HFD from 1D profile
-def find_hfr_from_1D(profile, thres=0, debugplots=False):
+def find_hfd_from_1D(profile, thres=0, debugplots=False):
 
     # compute flux within values lx and rx in profile.
     # proffunc should be an scipy interp1d object representing

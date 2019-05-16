@@ -1,10 +1,13 @@
+import os
 import sys
 import time
+import argparse
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
-print(sys.path)
+FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
+#FOCUS_DRIVER = 'ASCOM.MoonliteDRO.Focuser'
 
 def get_backend_for_os():
     import os
@@ -26,15 +29,46 @@ else:
     raise Exception(f'Unknown backend {BACKEND} - choose ASCOM or INDI in BackendConfig.py')
 
 
+if BACKEND == 'ASCOM':
+    from pyastrobackend.ASCOMBackend import DeviceBackend as Backend
+    from pyastrobackend.ASCOM.Focuser import Focuser
+elif BACKEND == 'INDI':
+    from pyastrobackend.INDIBackend import DeviceBackend as Backend
+    from pyastrobackend.INDIBackend import Focuser
+else:
+    raise Exception(f'Unknown backend {BACKEND} - choose ASCOM or INDI in BackendConfig.py')
+
+def connect_focuser(backend):
+    if BACKEND == 'ASCOM':
+        focuser = Focuser()
+    elif BACKEND == 'INDI':
+        focuser = Focuser(backend)
+
+    rc = focuser.connect(FOCUS_DRIVER)
+
+    if rc:
+        return focuser
+    else:
+        return None
+
+def wait_on_focuser_move(focuser, timeout=60):
+    ts = time.time()
+    while (time.time()-ts) < timeout:
+        logging.info(f'waiting on focuser move - curpos = {focuser.get_absolute_position()}')
+        if not focuser.is_moving():
+            break
+        time.sleep(0.5)
+    time.sleep(0.5) # just be sure its done
 
 
-def connect_camera():
+# FIXME INDI stuff is broken!!!!
+def connect_camera(backend):
     if BACKEND == 'ASCOM':
         driver = 'MaximDL'
         cam = MaximDL_Camera()
     elif BACKEND == 'INDI':
         driver = 'INDICamera'
-        cam = INDI_Camera(self.backend)
+        cam = INDI_Camera(backend)
 
     logging.info(f'connect_camera: driver = {driver}')
 
@@ -49,13 +83,79 @@ def connect_camera():
     else:
         rc = cam.connect(driver)
 
-
-
     if not rc:
         logging.error('connect_camera(): Unable to connect to camera!')
         return None
     return cam
 
+# take exposure
+def take_exposure(focus_expos, output_filename):
+
+    focus_expos = 1
+
+    # reset frame to full sensor
+    cam.set_binning(1, 1)
+    width, height = cam.get_size()
+    cam.set_frame(0, 0, width, height)
+    cam.start_exposure(focus_expos)
+
+    # give things time to happen (?) I get Maxim not ready errors so slowing it down
+    time.sleep(0.25)
+
+    elapsed = 0
+    while not cam.check_exposure():
+        logging.info(f"Taking image with camera {elapsed} of {focus_expos} seconds")
+        time.sleep(0.5)
+        elapsed += 0.5
+        if elapsed > focus_expos:
+            elapsed = focus_expos
+
+    logging.info('Exposure complete')
+    # give it some time seems like Maxim isnt ready if we hit it too fast
+    time.sleep(0.5)
+
+    ff = os.path.join(os.getcwd(), output_filename)
+
+    retries = 0
+    while True:
+        logging.info(f"Going to save {ff}")
+
+        # FIXME we only call this because the
+        # MaximDL backend needs it to save to disk
+        # RPC backend already has saved it to disk by now
+        if BACKEND == 'INDI':
+            # FIXME need better way to handle saving image to file!
+            image_data = cam.get_image_data()
+            # this is an hdulist
+            image_data.writeto(ff, overwrite=True)
+            result = True
+        else:
+            result = cam.save_image_data(ff)
+
+        if result is True:
+            logging.info("Save successful")
+            break
+
+        retries += 1
+        if retries > 3:
+            logging.error(f"Failed to save {ff}!! Aborting!")
+            return False
+
+        logging.error(f"Failed to save {ff}!! Trying again")
+        time.sleep(1)
+
+    return True
+
+def parse_commandline():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('focus_low', type=int, help='Low end of focus run')
+    parser.add_argument('focus_high', type=int, help='High end of focus run')
+    parser.add_argument('focus_nstep', type=int, help='V Curve number of steps')
+    parser.add_argument('focus_dir', type=str, help='IN or OUT')
+
+    #    parser.add_argument('--debuggraphs', action='store_true', help="Display debug graphs")
+
+    return parser.parse_args()
 
 if __name__ == '__main__':
     logging.basicConfig(filename='sample_vcurve.log',
@@ -72,33 +172,61 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
+    args = parse_commandline()
+    logging.info(f'args = {args}')
+
+    # connect focuser
+    focuser = connect_focuser(Backend)
+    logging.info(f'focuser = {focuser}')
+
     # connect camera
-    cam = connect_camera()
+    cam = connect_camera(Backend)
     logging.info(f'cam = {cam}')
 
-    # take exposure
+    # create output dir
+    datestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+    imagesdir = datestr
+    os.mkdir(imagesdir)
 
+    # figure out direction
+    backlash = 200
+    if args.focus_dir == 'OUT':
+        # start past desired start and move to it to remove backlash
+        focus_init = args.focus_low - backlash
+        focus_start = args.focus_low
+        focus_end = args.focus_high
+        focus_nstep = args.focus_nstep
+    elif args.focus_dir == 'IN':
+        # start past desired start and move to it to remove backlash
+        focus_init = args.focus_high + backlash
+        focus_start = args.focus_high
+        focus_end = args.focus_low
+        focus_nstep = args.focus_nstep
+    else:
+        logging.error(f'Unknown focus directin {args.focus_dir} - exitting!')
+        sys.exit(1)
 
+    # move to init pos
+    logging.info(f'Moving to init pos {focus_init}')
+    if not focuser.move_absolute_position(focus_init):
+        logging.error("Focuser error!!")
+        sys.exit(1)
+
+    wait_on_focuser_move(focuser)
 
     focus_expos = 1
 
-    # reset frame to full sensor
-    cam.set_binning(1, 1)
-    width, height = cam.get_size()
-    cam.set_frame(0, 0, width, height)
-    cam.start_exposure(focus_expos)
+    focus_step = int((focus_end - focus_start)/(focus_nstep - 1))
+    logging.info(f'Focus run from {focus_start} to {focus_end} step {focus_step}')
+    for focus_pos in range(focus_start, focus_end+focus_step, focus_step):
+        logging.info(f'Moving to focus pos {focus_pos}')
+        if not focuser.move_absolute_position(focus_pos):
+            logging.error("Focuser error!!")
+            sys.exit(1)
 
-    # give things time to happen (?) I get Maxim not ready errors so slowing it down
-    time.sleep(0.25)
+        wait_on_focuser_move(focuser)
 
-    elapsed = 0
-    while not cam.check_exposure():
-        logging(f"Taking image with camera {elapsed} of {focus_expos} seconds")
-        time.sleep(0.5)
-        elapsed += 0.5
-        if elapsed > focus_expos:
-            elapsed = focus_expos
+        logging.info('Taking exposure')
+        rc = take_exposure(focus_expos, os.path.join(imagesdir, f'vcurve_focuspos_{focus_pos}.fit'))
+        logging.info(f'exposure result code = {rc}')
 
-    logging.info('Exposure complete')
-    # give it some time seems like Maxim isnt ready if we hit it too fast
-    time.sleep(0.5)
