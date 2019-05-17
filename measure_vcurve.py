@@ -37,15 +37,15 @@ if __name__ == '__main__':
 
 #    logging.info(f'command args = {args}')
 
-    imgfiles = glob.glob(os.path.join(args.imgdir), '*.fit')
+    imgfiles = glob.glob(os.path.join(args.imgdir, '*.fit'))
 
     logging.info(f'imgfiles = {imgfiles}')
 
     focus_re = re.compile('^.*focuspos_(?P<pos>\d{2,}).fit$')
 
-    for infile in imgfiles:
+    for infile in sorted(imgfiles):
 
-        focus_pos = focus_re.match(infile)
+        focus_pos = focus_re.match(infile).group(1)
         logging.info(f'infile = {infile} focus_pos = {focus_pos}')
 
         hdu = pyfits.open(infile)

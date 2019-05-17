@@ -25,100 +25,13 @@ import argparse
 import numpy as np
 from scipy import signal, ndimage
 from scipy.interpolate import interp1d
-from scipy.integrate import quad, romb
+from scipy.integrate import romb
 
 import astropy.io.fits as pyfits
 
 # for testing
 import matplotlib.pyplot as plt
 
-class StarFitResult:
-    def __init__(self, star_cx, star_cy, star_r, star_f,
-                 nstars, bgest, noiseest, width, height):
-        self.star_cx = star_cx
-        self.star_cy = star_cy
-        self.star_r = star_r
-        self.star_f = star_f
-        self.nstars = nstars
-        self.bgest = bgest
-        self.noiseest = noiseest
-        self.width = width
-        self.height = height
-
-    # compute split of stars in different annuli in percentage of image diagonal
-
-    def compute_hfr_in_out(self, r_ex=0, r_in=0.35, r_gap=0.1, r_out=0.9):
-
-        hfr_result_in = self.filter_range(r_low=r_ex, r_high=r_in)
-        hfr_result_out = self.filter_range(r_low=r_in+r_gap, r_high=r_out)
-
-        if hfr_result_in.nstars > 0:
-            hfr_in = np.median(hfr_result_in.star_r)
-        else:
-            hfr_in = np.nan
-
-        if hfr_result_out.nstars > 0:
-            hfr_out = np.median(hfr_result_out.star_r)
-        else:
-            hfr_out = np.nan
-
-        self.hfr_in = hfr_in
-        self.hfr_out = hfr_out
-
-        return
-
-        diag2 = (self.width**2+self.height**2)/4
-
-        halfwid = self.width/2
-        halfht  = self.height/2
-
-        thres_ex2 = diag2*r_ex**2
-        thres_in2 = diag2*r_in**2
-        thres_gap2 = diag2*(r_in+r_gap)**2
-        thres_out2 = diag2*r_out**2
-
-        hfr_in = []
-        hfr_out = []
-
-        for x, y, r in zip(self.star_cx, self.star_cy, self.star_r):
-            rad2 = (x-halfwid)**2+(y-halfht)**2
-            if rad2 < thres_ex2:
-                continue
-            if rad2 < thres_in2:
-                hfr_in.append(r)
-                continue
-            if rad2 > thres_gap2 and rad2 < thres_out2:
-                hfr_out.append(r)
-
-        self.hfr_in = np.median(hfr_in)
-        self.hfr_out = np.median(hfr_out)
-
-    # return StarFitResult object with only stars in specified range
-    # radius is specified as fraction (0 to 1) of 1/2 diagonal distance
-    def filter_range(self, r_low=0, r_high=1):
-        diag2 = (self.width**2+self.height**2)/4
-
-        halfwid = self.width/2
-        halfht  = self.height/2
-
-        thres_low = diag2*r_low**2
-        thres_high = diag2*r_high**2
-
-        rad2 = (self.star_cx-halfwid)**2 + (self.star_cy-halfht)**2
-
-        valid_r_idx = np.where(np.logical_and(rad2 >= thres_low, rad2 <= thres_high))
-
-        logging.info(f'valid_r_idx = {valid_r_idx[0].shape[0]}')
-
-        return StarFitResult(self.star_cx[valid_r_idx],
-                             self.star_cy[valid_r_idx],
-                             self.star_r[valid_r_idx],
-                             self.star_f[valid_r_idx],
-                             valid_r_idx[0].shape[0],
-                             self.bgest,
-                             self.noiseest,
-                             self.width,
-                             self.height)
 
 #
 # using lots of window x window samples compute median
@@ -167,142 +80,6 @@ def find_centroid(image_data, thres):
     cj = wsum_j/total
 
     return (ci, cj)
-
-
-# compute radial profile - returns (rad[], val[])
-def compute_radial_profile(data, ci, cj, bg):
-    #ts = time.time()
-
-    ni, nj = data.shape
-
-    rad = np.zeros(ni*nj+1)
-    val = np.zeros(ni*nj+1)
-    rad[0] = 0.0
-    val[0] = 0.0
-
-    # build array containing X indices and Y indices
-    ij = np.mgrid[0:ni, 0:nj]
-    i=ij[0]
-    j=ij[1]
-
-    di = i - ci
-    dj = j - cj
-    rad  = np.sqrt(di*di + dj*dj).flatten()
-    val = (data - bg).flatten()
-
-    # first sort by rad
-    sortidx = rad.argsort()
-    rad = np.concatenate(([0], rad[sortidx]))
-    val = np.concatenate(([0], val[sortidx]))
-
-    #print "compute_radial_profile took", time.time() - ts
-
-    return (rad, val)
-
-def find_hfr_from_radial_profile(rad, val, window, extras=False):
-    # compute integrated flux - limit to just the circular area of diameter window
-    fluxrad = np.zeros(len(rad))
-    fluxtot = 0.0
-    nneg = 0
-    for i in range(0, len(rad)):
-
-        if rad[i] > window:
-            break
-
-        # OLD CODE TO STOP INTEGRATION3
-        if nneg < 100:
-            fluxtot += val[i]
-            fluxrad[i] = fluxtot
-        else:
-            fluxrad[i] = fluxrad[i-1]
-
-        if i > 0:
-            if fluxrad[i] < fluxrad[i-1]:
-                nneg += 1
-        # END OLD CODE
-
-        # NEW CODE USING MAXIMUM
-        fluxtot += val[i]
-        fluxrad[i] = fluxtot
-        # END NEW CODE
-
-# DEBUG
-        if False: #or DEBUG_FITSTAR_LOGGING:
-            if i == 0:
-                print(rad[i], val[i], fluxrad[i])
-            else:
-                print(rad[i], val[i], fluxrad[i], (fluxrad[i]-fluxrad[i-1])/(fluxrad[i]))
-
-# END DEBUG
-
-    # capture length of filled entries
-    radlen = i
-
-    # NEW CODE FOR MAXIMUM CONT'D
-    fluxmaxidx = np.argmax(fluxrad)
-    fluxmax = fluxrad[fluxmaxidx]
-
-    #Dprint "fluxmax at idx ",fluxmaxidx, " value=", fluxmax
-
-    # set rest of array to max value
-    fluxrad[fluxmaxidx:] = fluxmax
-
-    #DEBUG RADPROF
-    # fidx = 0
-    # while True and fidx < 20:
-        # try:
-            # f=open("radprof-%03d.csv" % (fidx,), "w")
-            # for i in range(0, len(rad)):
-                # f.write("%f,%f,%f\n" % (rad[i], val[i], fluxrad[i]))
-            # f.close()
-            # break
-        # except:
-            # fidx += 1
-            # print "fidx = ",fidx
-
-    #END DEBUG RADPROF
-
-    # did we detect a star?
-    if fluxtot <= 0:
-        return None
-
-    # find half flux
-    rfit = interp1d(rad, fluxrad)
-
-    rmin = 0.0
-    rmax = np.amax(rad)
-    ftarg = fluxmax/2.0
-    while True:
-        rmid = (rmin+rmax)/2.0
-        f = rfit(rmid)
-        #print(ftarg, f, rmin, rmid, rmax)
-        if f < ftarg:
-            rmin = rmid
-        elif f > ftarg:
-            rmax = rmid
-        else:
-            break
-
-# DEGUG
-#        if DEBUG_FITSTAR_LOGGING:
-#            print(rmid, rmin, rmax, ftarg, f)
-# END DEBUG
-
-        if (rmax-rmin) < 0.001:
-            break
-
-    # compute contrast (ratio of center value divided by hfr value
-    #
-    proffit = interp1d(rad, val)
-    #contrast = val[1]/proffit(rmid)
-    # FIXME contrast doesnt work for defocused stars and we're getting really small denominators (or 0!)
-    contrast = 1
-
-    # return position relative to corner of crop window
-    if not extras:
-        return (rmid, 0, fluxtot, contrast)
-    else:
-        return ((rmid, 0, fluxtot, contrast), (rad, val, fluxrad, fluxtot))
 
 def star_fit_hfd(image_data, max_stars=100, bgfact=50, satur=50000, window=7,
                  debugfits=False):
@@ -529,6 +306,7 @@ def star_fit_hfd(image_data, max_stars=100, bgfact=50, satur=50000, window=7,
 
 
 def find_star(image_data, bgfact=50, satur=50000, window=100, debugfits=False):
+    logging.info(f'find_star: debugfits = {debugfits}')
 
     logging.info(f'find_stars start: bgfact={bgfact} window={window}')
 
@@ -593,7 +371,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100, debugfits=False):
     # find structures
     star_label, nstars = ndimage.measurements.label(dilate_star_model)
 
-    print(star_label, nstars)
+    #print(star_label, nstars)
     if debugfits:
         pyfits.writeto(f'star_label.fits', star_label.astype(float), overwrite=True)
 
@@ -622,11 +400,24 @@ def find_star(image_data, bgfact=50, satur=50000, window=100, debugfits=False):
     cy, cx = ndimage.measurements.center_of_mass(star_boxes)
     logging.info(f'COM cx, cy = {cx}, {cy}')
 
+    # compute background near star
+    #
+    yl = max(0, int(cy)-bg_window)
+    ym = min(ht-1, yl+bg_window)
+    xl = max(0, int(cx)-bg_window)
+    xm = min(wd-1, xl+bg_window)
+    #print('xl/xm/yl/xm=', xl, xm, yl, ym)
+    data = bgmodel[yl:ym, xl:xm]
+    bglevel = np.median(data)
+    data = bgrem_data[yl:ym, xl:xm]
+    bgmad = compute_noise_level(data)
+    logging.info(f'bg = {bglevel} mad = {bgmad}')
+
     ttot_e = time.time()
 
-    logging.info(f'find_star took {ttot_s-ttot_e} seconds')
+    logging.info(f'find_star took {ttot_e-ttot_s} seconds')
 
-    return cx, cy
+    return cx, cy, bglevel, bgmad
 
 
 # horizontal bin data to form a 1D star profile
@@ -638,8 +429,8 @@ def horiz_bin_window(data, bg=0):
 
     profile = np.sum(data-bg, axis=0)
 
-    print(data)
-    print(profile)
+#    print(data)
+#    print(profile)
 
     return profile
 
@@ -648,7 +439,7 @@ def find_star_limits(profile, thres=0):
 
     # search from left side (idx=0) for first pixel over thres
     idx = np.where(profile > thres)[0]
-    print('where -> ', idx)
+    #print('where -> ', idx)
     if len(idx) < 2:
         return None, None
 
@@ -664,8 +455,8 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     # proffunc should be an scipy interp1d object representing
     # the 1D profile of the star which has been background
     # subtracted
-    def flux(proffunc, lx, rx):
-        return quad(proffunc, lx, rx, epsabs=1, limit=100)[0]
+#    def flux(proffunc, lx, rx):
+#        return quad(proffunc, lx, rx, epsabs=1, limit=100)[0]
 
     # different way
     def flux2(proffunc, rlo, rhi):
@@ -677,16 +468,16 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     # compute center of profile with weighted average
     plen = profile.shape[0]
 
-    print('profile len = ', plen)
+    #print('profile len = ', plen)
 
     idx = np.arange(0, plen, 1)
-    print(idx)
+    #print(idx)
 
     cidx = np.sum(idx*profile)/np.sum(profile)
-    print('center = ', cidx)
+    logging.info(f'center = {cidx}')
 
     lidx, ridx = find_star_limits(profile, thres)
-    print('left, right = ', lidx, ridx)
+    logging.info(f'left, right = {lidx}, {ridx}')
 
     # find left, right limits
     # invert profile as y as a function of x on left and right
@@ -695,9 +486,9 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     lidx_hi = int(lidx+2)
     ridx_low = int(ridx-1)
     ridx_hi = int(ridx+2)
-    print(lidx, lidx_low, lidx_hi, ridx, ridx_low, ridx_hi)
-    print(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
-    print(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
+    #print(lidx, lidx_low, lidx_hi, ridx, ridx_low, ridx_hi)
+    #print(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
+    #print(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
     lfunc = interp1d(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
     rfunc = interp1d(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
 
@@ -715,22 +506,22 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
         ax_2.plot(profile[ridx_low:ridx_hi], rfunc(profile[ridx_low:ridx_hi]))
         ax_2.axhline(rx, color='green')
 
-    print('lx=', lx, thres, proffunc(lx))
-    print('rx=', rx, thres, proffunc(rx))
+    #print('lx=', lx, thres, proffunc(lx))
+    #print('rx=', rx, thres, proffunc(rx))
 
     # make sure inversion worked
     INVERSE_FRAC = 0.05
     if abs(thres-proffunc(lx))/thres > INVERSE_FRAC or abs(thres-proffunc(rx))/thres > INVERSE_FRAC:
-        print('inversion failed!')
+        logging.error('inversion failed!')
         return None, None, None
 
     # now find flux inside left/right
     simple_totflux = np.sum([profile[lidx:ridx]])
-    print('flux in star (simple) = ', simple_totflux)
+    logging.info(f'flux in star (simple) = {simple_totflux}')
 
     totflux = flux2(proffunc, lx, rx)
     #print('integrated flux in star = ', flux(proffunc, lidx, ridx))
-    print('integrated flux in star = ', flux)
+    logging.info(f'integrated flux in star = {totflux}')
 
     # compute flux as function of distance from center
     r_max = min(cidx-lx, rx-cidx)
@@ -759,15 +550,46 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     half_flux_r = flux_inv(totflux/2)
 
     logging.info(f'half flux rad = {half_flux_r}')
-    print(r_arr)
+    #print(r_arr)
     #print(flux_vs_r)
-    print(flux2_vs_r)
+    #print(flux2_vs_r)
     #ax_3.plot(r_arr, flux_vs_r)
     if debugplots:
         ax_3.plot(r_arr, flux2_vs_r)
         ax_3.axvline(half_flux_r, color='green')
 
     return cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r
+
+def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
+    logging.info(f'find_brightest_star_HFD: debugfits = {debugfits}')
+    xcen, ycen, bg, noise = find_star(image_data, debugfits=debugfits)
+
+    img_ht, img_wd = image_data.shape
+
+    xlow = max(0, int(xcen-win/2))
+    xhi = min(img_wd-1, int(xcen+win/2))
+    ylow = max(0, int(ycen-win/2))
+    yhi = min(img_ht-1, int(ycen+win/2))
+    crop_data = image_data[ylow:yhi, xlow:xhi]
+
+    if debugplots:
+        fig = plt.figure()
+        ax_2d = fig.add_subplot(121)
+        ax_1d = fig.add_subplot(122)
+        im = ax_2d.imshow((crop_data-bg).astype(float))
+        fig.colorbar(im, ax=ax_2d)
+
+    profile = horiz_bin_window(crop_data, bg=bg)
+
+    logging.info(f'thres = {thres}')
+    logging.info(f'profile = {profile}')
+
+    if debugplots:
+        ax_1d.plot(profile)
+        plt.draw()
+
+    return find_hfd_from_1D(profile, thres=thres)
+
 
 def test_1d_with_gaussian():
 
@@ -803,7 +625,7 @@ def test_1d_with_gaussian():
     print('thres = ', thres)
     print('profile = ', profile)
 
-    scen, sl, sr = find_hfr_from_1D(profile, thres=thres)
+    scen, sl, sr = find_hfd_from_1D(profile, thres=thres)
 
     ax_1d.plot(profile)
 
@@ -817,6 +639,9 @@ def test_1d_with_gaussian():
     plt.show()
 
     sys.exit(1)
+
+
+
 
 
 if __name__ == '__main__':

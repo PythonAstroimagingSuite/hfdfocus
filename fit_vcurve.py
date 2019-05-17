@@ -1,4 +1,5 @@
 import logging
+import argparse
 import numpy as np
 from scipy.stats import siegelslopes
 import matplotlib.pyplot as plt
@@ -20,7 +21,13 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
-    f = open('hfd.txt', 'r')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('hfd_filename', type=str, nargs='?', default='hfd.txt', help='HFR data file name')
+    args = parser.parse_args()
+
+    hfd_file = args.hfd_filename
+
+    f = open(hfd_file, 'r')
 
     fpos_arr = []
     hfd_arr = []
