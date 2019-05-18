@@ -55,7 +55,7 @@ if __name__ == '__main__':
         bg = 800
         thres = 10000
 
-        xcen, ycen = find_star(image_data, debugfits=True)
+        xcen, ycen, bg, mad = find_star(image_data, debugfits=True)
 
         win = 100
         xlow = int(xcen-win/2)

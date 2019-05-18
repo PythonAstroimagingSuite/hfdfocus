@@ -6,8 +6,8 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
-FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
-#FOCUS_DRIVER = 'ASCOM.MoonliteDRO.Focuser'
+ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
+#ASCOM_FOCUS_DRIVER = 'ASCOM.MoonliteDRO.Focuser'
 
 def get_backend_for_os():
     import os
@@ -21,13 +21,84 @@ def get_backend_for_os():
 
 BACKEND = get_backend_for_os()
 
-if BACKEND == 'ASCOM':
-    from pyastrobackend.MaximDL.Camera import Camera as MaximDL_Camera
-elif BACKEND == 'INDI':
-    from pyastrobackend.INDIBackend import Camera as INDI_Camera
-else:
-    raise Exception(f'Unknown backend {BACKEND} - choose ASCOM or INDI in BackendConfig.py')
+# debugging override with simulator
+BACKEND = 'SIMULATOR'
 
+import astropy.io.fits as pyfits
+from c8_simul_star import C8_F7_Star_Simulator
+
+class FocusSimlatorDriver:
+    def __init__(self):
+        self.destpos = 8000
+
+    def move_absolute_position(self, pos):
+        self.destpos = pos
+        return True
+
+    def get_absolute_position(self):
+        return self.destpos
+
+    def is_moving(self):
+        return False
+
+    def __getattr__(self, name):
+        def method(*args):
+            print("tried to handle unknown method " + name)
+            if args:
+                print("it had arguments: " + str(args))
+            return True
+
+        if name in self.__dict__:
+            return self.__dict__[name]
+        else:
+            return method
+
+# camera driver needs to access simuluated focus driver
+# in order to create star image scaled
+#
+# NOTE NOTE NOTE
+# focus center of 7983 is based on the
+class CameraSimlatorDriver:
+    def __init__(self, focus_driver):
+        self.focus_driver = focus_driver
+        self.simul = C8_F7_Star_Simulator()
+        self.focus_center = self.simul.get_best_focus_pos()
+        self.image_shape = self.simul.get_simul_star_image(0, 0).shape
+
+    def get_size(self):
+        #print(self.image_shape)
+        return self.image_shape
+
+    def save_image_data(self, fname):
+        data = self.simul.get_simul_star_image(self.focus_driver.get_absolute_position(), self.focus_center)
+        pyfits.writeto(fname, data.astype(float), overwrite=False)
+        return True
+
+    def __getattr__(self, name):
+        def method(*args):
+            print("tried to handle unknown method " + name)
+            if args:
+                print("it had arguments: " + str(args))
+            return True
+
+        if name in self.__dict__:
+            return self.__dict__[name]
+        else:
+            return method
+
+# camera driver needs to access simuluated focus driver
+# in order to create star image scaled
+class BackendSimlatorDriver:
+    def __init__(self):
+        pass
+
+    def __getattr__(self, name):
+        def method(*args):
+            print("tried to handle unknown method " + name)
+            if args:
+                print("it had arguments: " + str(args))
+            return True
+        return method
 
 if BACKEND == 'ASCOM':
     from pyastrobackend.ASCOMBackend import DeviceBackend as Backend
@@ -35,16 +106,35 @@ if BACKEND == 'ASCOM':
 elif BACKEND == 'INDI':
     from pyastrobackend.INDIBackend import DeviceBackend as Backend
     from pyastrobackend.INDIBackend import Focuser
+elif BACKEND == 'SIMULATOR':
+    Backend = BackendSimlatorDriver()
+    SimFocuser = FocusSimlatorDriver()
 else:
     raise Exception(f'Unknown backend {BACKEND} - choose ASCOM or INDI in BackendConfig.py')
 
+
+if BACKEND == 'ASCOM':
+    from pyastrobackend.MaximDL.Camera import Camera as MaximDL_Camera
+elif BACKEND == 'INDI':
+    from pyastrobackend.INDIBackend import Camera as INDI_Camera
+elif BACKEND == 'SIMULATOR':
+    SimCamera = CameraSimlatorDriver(SimFocuser)
+else:
+    raise Exception(f'Unknown backend {BACKEND} - choose ASCOM or INDI in BackendConfig.py')
+
+
+
 def connect_focuser(backend):
+    global SimFocuser
+
     if BACKEND == 'ASCOM':
         focuser = Focuser()
     elif BACKEND == 'INDI':
         focuser = Focuser(backend)
+    elif BACKEND == 'SIMULATOR':
+        focuser = SimFocuser
 
-    rc = focuser.connect(FOCUS_DRIVER)
+    rc = focuser.connect(ASCOM_FOCUS_DRIVER)
 
     if rc:
         return focuser
@@ -63,12 +153,17 @@ def wait_on_focuser_move(focuser, timeout=60):
 
 # FIXME INDI stuff is broken!!!!
 def connect_camera(backend):
+    global SimCamera
+
     if BACKEND == 'ASCOM':
         driver = 'MaximDL'
         cam = MaximDL_Camera()
     elif BACKEND == 'INDI':
         driver = 'INDICamera'
         cam = INDI_Camera(backend)
+    elif BACKEND == 'SIMULATOR':
+        driver = 'Simulator'
+        cam = SimCamera
 
     logging.info(f'connect_camera: driver = {driver}')
 
@@ -182,6 +277,7 @@ if __name__ == '__main__':
     # connect camera
     cam = connect_camera(Backend)
     logging.info(f'cam = {cam}')
+    logging.info(f'cam size = {cam.get_size()}')
 
     # create output dir
     datestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())

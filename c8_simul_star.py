@@ -63,7 +63,8 @@ def shrink_star(starimage_data, bgimage_data, reduction):
 
 
 class C8_F7_Star_Simulator:
-    def __init__(self, starimage_name, bgimage_name):
+    def __init__(self, starimage_name='data/C8_Simul_Defocus_Star.fit',
+                 bgimage_name='data/C8_Simul_BG.fit'):
 
         # load background image
         #bgimage_name = 'data/C8_Simul_BG.fit'
@@ -82,6 +83,10 @@ class C8_F7_Star_Simulator:
         self.ref_hfd = hfr-hfl
         logging.info(f'Reference star HFD = {self.ref_hfd}')
 
+
+    # measured best focus position from sampled V curve
+    def get_best_focus_pos(self):
+        return 7983
 
     # based on data measured 2019/05/13 on C8 @ f/7
     def simul_hfd_size(self, focus_pos, focus_cen):
