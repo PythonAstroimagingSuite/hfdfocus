@@ -53,8 +53,8 @@ def shrink_star(starimage_data, bgimage_data, reduction):
     hx = lx + sh_wd
     ly = int((bg_ht-sh_ht)/2)
     hy = ly + sh_ht
-    print(bg_ht, bg_wd, sh_ht, sh_wd)
-    print(lx,hx,ly,hy)
+    #print(bg_ht, bg_wd, sh_ht, sh_wd)
+    #print(lx,hx,ly,hy)
     shrunk_image = np.copy(bgimage_data)
     shrunk_image[ly:hy, lx:hx] = np.maximum(shrunk_image[ly:hy, lx:hx], shrunk_star_data)
     #pyfits.writeto(f'shrunk_data.fits', shrunk_data.astype(float), overwrite=True)
@@ -78,11 +78,9 @@ class C8_F7_Star_Simulator:
         self.starimage_data = hdu[0].data.astype(float)
         hdu.close()
 
-        # measure star size
-        scen, sl, sr, hfl, hfr = find_brightest_star_HFD(self.starimage_data)
-        self.ref_hfd = hfr-hfl
-        logging.info(f'Reference star HFD = {self.ref_hfd}')
-
+        # will compute when required so we don't
+        # create logging and other computations on creation
+        self.ref_hfd = None
 
     # measured best focus position from sampled V curve
     def get_best_focus_pos(self):
@@ -90,6 +88,14 @@ class C8_F7_Star_Simulator:
 
     # based on data measured 2019/05/13 on C8 @ f/7
     def simul_hfd_size(self, focus_pos, focus_cen):
+        # load this on demand
+        if self.ref_hfd is None:
+            # measure star size
+            scen, sl, sr, hfl, hfr = find_brightest_star_HFD(self.starimage_data)
+            self.ref_hfd = hfr-hfl
+            logging.info(f'Reference star HFD = {self.ref_hfd}')
+
+
         # equation is for fit to left side of vcurve
         # we will just mirror it to right side
         # df needs to be negative because of how left side fit was done
@@ -102,7 +108,9 @@ class C8_F7_Star_Simulator:
     # given a desired 'best focus' position focus_cen and
     # a current focuser position return a scaled image of
     # a defocused star based on sampled V curve data
-    def get_simul_star_image(self, focus_pos, focus_cen):
+    def get_simul_star_image(self, focus_pos, focus_cen=None):
+        if focus_cen is None:
+            focus_cen = self.get_best_focus_pos()
         hfd = self.simul_hfd_size(focus_pos, focus_cen)
         red = min(1.0, hfd/self.ref_hfd)
         shrunk_image = shrink_star(self.starimage_data, self.bgimage_data, red)
