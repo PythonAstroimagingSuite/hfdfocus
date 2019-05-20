@@ -1,0 +1,6 @@
+*~
+*.log
+*__pycache**
+*.fit
+*.fits
+*.py[cod]

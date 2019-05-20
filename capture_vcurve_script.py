@@ -13,10 +13,15 @@ import matplotlib.pyplot as plt
 
 ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
 
-from pyastrobackend.SimpleDeviceInterface import connect_focuser
-from pyastrobackend.SimpleDeviceInterface import connect_camera
-from pyastrobackend.SimpleDeviceInterface import take_exposure
-from pyastrobackend.SimpleDeviceInterface import wait_on_focuser_move
+#from pyastrobackend.SimpleDeviceInterface import connect_backend
+#from pyastrobackend.SimpleDeviceInterface import connect_focuser
+#from pyastrobackend.SimpleDeviceInterface import connect_camera
+#from pyastrobackend.SimpleDeviceInterface import take_exposure
+#from pyastrobackend.SimpleDeviceInterface import wait_on_focuser_move
+
+from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
+
+
 from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 
 # for simulator
@@ -31,6 +36,9 @@ def parse_commandline():
     parser.add_argument('nruns', type=int, help='Number of vcurve runs')
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
+    parser.add_argument('--focuser_driver', type=str,  help='Focuser Driver')
+    parser.add_argument('--camera_driver', type=str,  help='Camera Driver')
+
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -53,12 +61,22 @@ if __name__ == '__main__':
 
     # connect focuser and camera
     if not args.simul:
-        focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
-        logging.info(f'focuser = {focuser}')
+        sdi = SDI()
 
-        cam = connect_camera()
+        sdi.connect_backend()
+
+        #focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
+        logging.info(f'Connecting to focuser driver {args.focuser_driver}')
+        focuser = sdi.connect_focuser(args.focuser_driver)
+        logging.info(f'focuser = {focuser}')
+        if not focuser:
+            logging.error(f'Unabled to connect to focuser driver {args.focuser_driver}')
+
+        logging.info(f'Connecting to camera driver {args.camera_driver}')
+        cam = sdi.connect_camera(args.camera_driver)
         logging.info(f'cam = {cam}')
-        logging.info(f'cam size = {cam.get_size()}')
+        if not cam:
+            logging.error(f'Unabled to connect to camera driver {args.camera_driver}')
     else:
         simul_star = C8_F7_Star_Simulator()
 
@@ -92,7 +110,7 @@ if __name__ == '__main__':
             logging.error("Focuser error!!")
             sys.exit(1)
 
-        wait_on_focuser_move(focuser)
+        sdi.wait_on_focuser_move(focuser)
 
     if args.debugplots:
         logging.info('Creating figure')
@@ -129,10 +147,10 @@ if __name__ == '__main__':
                     logging.error("Focuser error!!")
                     sys.exit(1)
 
-                wait_on_focuser_move(focuser)
+                sdi.wait_on_focuser_move(focuser)
 
                 logging.info('Taking exposure')
-                rc = take_exposure(cam, focus_expos, imgname)
+                rc = sdi.take_exposure(cam, focus_expos, imgname)
                 logging.info(f'exposure result code = {rc}')
 
             else:
@@ -147,7 +165,7 @@ if __name__ == '__main__':
             bg = 800
             thres = 10000
 
-            xcen, ycen, bg, mad = find_star(starimage_data, debugfits=False)
+            xcen, ycen, bg, mad = find_star(starimage_data, debugfits=True)
 
             win = 100
             xlow = int(xcen-win/2)
@@ -168,7 +186,12 @@ if __name__ == '__main__':
             if args.debugplots:
                 ax_1d.plot(profile)
 
-            scen, sl, sr, hfl, hfr = find_hfd_from_1D(profile, thres=thres)
+            rc = find_hfd_from_1D(profile, thres=thres)
+            if rc is None:
+                logging.error('No star found in image {imgname} - aborting!')
+                sys.exit(1)
+
+            scen, sl, sr, hfl, hfr = rc
 
             fpos_arr.append(focus_pos)
             hfd_arr.append(hfr-hfl)

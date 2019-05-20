@@ -478,6 +478,8 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
 
     lidx, ridx = find_star_limits(profile, thres)
     logging.info(f'left, right = {lidx}, {ridx}')
+    if lidx is None or ridx is None:
+        return None
 
     # find left, right limits
     # invert profile as y as a function of x on left and right
@@ -558,7 +560,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
         ax_3.plot(r_arr, flux2_vs_r)
         ax_3.axvline(half_flux_r, color='green')
 
-    return cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r
+    return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r)
 
 def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
     logging.info(f'find_brightest_star_HFD: debugfits = {debugfits}')
