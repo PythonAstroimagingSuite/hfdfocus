@@ -380,13 +380,17 @@ def find_star(image_data, bgfact=50, satur=50000, window=100, debugfits=False):
     max_pix = 0
     max_l = None
     for l in ndimage.find_objects(star_label):
+        print(f'l={l}')
         npix = (l[0].stop-l[0].start)*(l[1].stop-l[1].start)
-        #print(bgrem_data[l].shape, npix)
+        print(bgrem_data[l].shape, npix)
+        
         if npix < 9:
+            print('not enuf pix')
             continue
 
-        if (bgrem_data[l] > satur).sum() > 0:
-            continue
+#        if (bgrem_data[l] > satur).sum() > 0:
+#            print('bgrem too high')
+#            continue
 
         if npix > max_pix:
             max_pix = npix
@@ -515,7 +519,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     INVERSE_FRAC = 0.05
     if abs(thres-proffunc(lx))/thres > INVERSE_FRAC or abs(thres-proffunc(rx))/thres > INVERSE_FRAC:
         logging.error('inversion failed!')
-        return None, None, None
+        return None
 
     # now find flux inside left/right
     simple_totflux = np.sum([profile[lidx:ridx]])
@@ -545,6 +549,8 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
 #        flux2_vs_r.append(romb(fvals, dr))
 
         flux2_vs_r.append(flux2(proffunc, rlo, rhi))
+
+    print(f'flux2_vs_r, r = {flux2_vs_r} {r_arr}')
 
     # make inverse function of r vs flux to find half flux
     flux_inv = interp1d(flux2_vs_r, r_arr)

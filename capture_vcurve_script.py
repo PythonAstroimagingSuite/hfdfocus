@@ -29,8 +29,10 @@ from c8_simul_star import C8_F7_Star_Simulator
 
 def parse_commandline():
     parser = argparse.ArgumentParser()
-    parser.add_argument('focus_low', type=int, help='Low end of focus run')
-    parser.add_argument('focus_high', type=int, help='High end of focus run')
+#    parser.add_argument('focus_low', type=int, help='Low end of focus run')
+#    parser.add_argument('focus_high', type=int, help='High end of focus run')
+    parser.add_argument('focus_center', type=int, help='Center position of focus run')
+    parser.add_argument('focus_range', type=int, help='Range of focus run')
     parser.add_argument('focus_nstep', type=int, help='V Curve number of steps')
     parser.add_argument('focus_dir', type=str, help='IN or OUT')
     parser.add_argument('nruns', type=int, help='Number of vcurve runs')
@@ -42,6 +44,7 @@ def parse_commandline():
     parser.add_argument('--exposure_min', default=1, type=int,  help='Minimum exposure value')
     parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
+    parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
 
     return parser.parse_args()
 
@@ -89,33 +92,6 @@ if __name__ == '__main__':
     imagesdir = datestr
     os.mkdir(imagesdir)
 
-    # figure out direction
-    backlash = 200
-    if args.focus_dir == 'OUT':
-        # start past desired start and move to it to remove backlash
-        focus_init = args.focus_low - backlash
-        focus_start = args.focus_low
-        focus_end = args.focus_high
-        focus_nstep = args.focus_nstep
-    elif args.focus_dir == 'IN':
-        # start past desired start and move to it to remove backlash
-        focus_init = args.focus_high + backlash
-        focus_start = args.focus_high
-        focus_end = args.focus_low
-        focus_nstep = args.focus_nstep
-    else:
-        logging.error(f'Unknown focus directin {args.focus_dir} - exitting!')
-        sys.exit(1)
-
-    # move to init pos
-    logging.info(f'Moving to init pos {focus_init}')
-    if not args.simul:
-        if not focuser.move_absolute_position(focus_init):
-            logging.error("Focuser error!!")
-            sys.exit(1)
-
-        sdi.wait_on_focuser_move(focuser)
-
     if args.debugplots:
         logging.info('Creating figure')
         fig2 = plt.figure()
@@ -128,6 +104,8 @@ if __name__ == '__main__':
 
     fit_arr = []
 
+    focus_center = args.focus_center
+    focus_range = args.focus_range
     for iter in range(0, args.nruns):
         if iter != 0:
             fig2.clear()
@@ -138,6 +116,35 @@ if __name__ == '__main__':
             ax_2d = fig.add_subplot(121)
             ax_1d = fig.add_subplot(122)
 
+        # figure out direction
+        backlash = 200
+        focus_low = int(focus_center-focus_range/2)
+        focus_high = focus_low + args.focus_range
+        if args.focus_dir == 'OUT':
+            # start past desired start and move to it to remove backlash
+            focus_init = focus_low - backlash
+            focus_start = focus_low
+            focus_end = focus_high
+            focus_nstep = args.focus_nstep
+        elif args.focus_dir == 'IN':
+            # start past desired start and move to it to remove backlash
+            focus_init = focus_high + backlash
+            focus_start = focus_high
+            focus_end = focus_low
+            focus_nstep = args.focus_nstep
+        else:
+            logging.error(f'Unknown focus directin {args.focus_dir} - exitting!')
+            sys.exit(1)
+
+        # move to init pos
+        logging.info(f'Moving to init pos {focus_init}')
+        if not args.simul:
+            if not focuser.move_absolute_position(focus_init):
+                logging.error("Focuser error!!")
+                sys.exit(1)
+
+            sdi.wait_on_focuser_move(focuser)
+            
         focus_expos = args.exposure_start
         focus_step = int((focus_end - focus_start)/(focus_nstep - 1))
         logging.info(f'Focus run from {focus_start} to {focus_end} step {focus_step}')
@@ -154,8 +161,14 @@ if __name__ == '__main__':
 
                     sdi.wait_on_focuser_move(focuser)
 
-                    logging.info(f'Taking exposure exposure = {focus_expos} seconds')
-                    rc = sdi.take_exposure(cam, focus_expos, imgname)
+                    # NOTE roi in INDI not working for some reason (EKOS overriding?)
+                    # just take full frame then shrink
+                    roi = None
+
+                    logging.info(f'Taking exposure exposure = {focus_expos} seconds roi = {roi}')
+
+                    rc = sdi.take_exposure(cam, focus_expos, imgname, roi=roi)
+
                     logging.info(f'exposure result code = {rc}')
 
                 else:
@@ -166,13 +179,25 @@ if __name__ == '__main__':
                 starimage_data = hdu[0].data.astype(float)
                 hdu.close()
 
+                # use subframe
+                if not args.simul and args.framesize != 0:
+                    w, h = cam.get_size()
+                    xl = int(w/2-args.framesize/2)
+                    xw = args.framesize
+                    yt = int(h/2-args.framesize/2)
+                    yh = args.framesize
+                    logging.info(f'Shrinking to framesize = {args.framesize}')
+                    starimage_data = starimage_data[yt:yt+yh, xl:xl+xw]
+                    print(starimage_data.shape)
+                    pyfits.writeto('starimage_data.fits', starimage_data.astype(float), overwrite=True)
+
                 # analyze frame
                 bg = 800
                 thres = 10000
 
                 xcen, ycen, bg, mad = find_star(starimage_data, debugfits=True)
 
-                win = 100
+                win = 300
                 xlow = int(xcen-win/2)
                 xhi = int(xcen+win/2)
                 ylow = int(ycen-win/2)
@@ -202,7 +227,7 @@ if __name__ == '__main__':
                     logging.warning(f'No star found in image {imgname}')
 
                 focus_expos += 1
-                if not args.simul:
+                if args.simul:
                     logging.info(f'Simulated image did not have star - check settings.')
                     sys.exit(1)
 
@@ -252,6 +277,11 @@ if __name__ == '__main__':
 
         # find mininum value
         midx = np.argmin(hfd_arr)
+
+        # set new focus center to min
+        focus_center = fpos_arr[midx]
+        logging.info(f'Set new focus center to {focus_center}')
+        
         fpos_arr_l = np.array(fpos_arr[:midx-3])
         fpos_arr_r = np.array(fpos_arr[midx+4:])
         hfd_arr_l = np.array(hfd_arr[:midx-3])

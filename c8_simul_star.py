@@ -91,7 +91,7 @@ class C8_F7_Star_Simulator:
         # load this on demand
         if self.ref_hfd is None:
             # measure star size
-            scen, sl, sr, hfl, hfr = find_brightest_star_HFD(self.starimage_data)
+            scen, sl, sr, hfl, hfr, totflux = find_brightest_star_HFD(self.starimage_data)
             self.ref_hfd = hfr-hfl
             logging.info(f'Reference star HFD = {self.ref_hfd}')
 
