@@ -19,9 +19,6 @@ ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
 #from pyastrobackend.SimpleDeviceInterface import take_exposure
 #from pyastrobackend.SimpleDeviceInterface import wait_on_focuser_move
 
-from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
-
-
 from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 
 # for simulator
@@ -68,6 +65,7 @@ if __name__ == '__main__':
 
     # connect focuser and camera
     if not args.simul:
+        from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
         sdi = SDI()
 
         sdi.connect_backend()

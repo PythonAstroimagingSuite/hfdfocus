@@ -19,7 +19,7 @@ ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
 #from pyastrobackend.SimpleDeviceInterface import take_exposure
 #from pyastrobackend.SimpleDeviceInterface import wait_on_focuser_move
 
-from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
+#from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
 
 
 from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
@@ -27,21 +27,8 @@ from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 # for simulator
 from c8_simul_star import C8_F7_Star_Simulator
 
-def take_exposure_and_measure_star(cam, imgname, focus_expos):
+def measure_frame(starimage_data):
     global args, fig, fig2, ax_1d, ax_2d, ax_hfd, ax_hfd
-
-    if not args.simul:
-        logging.info(f'Taking exposure exposure = {focus_expos} seconds')
-        rc = sdi.take_exposure(cam, focus_expos, imgname)
-        logging.info(f'exposure result code = {rc}')
-
-    else:
-        tmp_starimage_data = simul_star.get_simul_star_image(focus_pos)
-        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-
-    hdu = pyfits.open(imgname)
-    starimage_data = hdu[0].data.astype(float)
-    hdu.close()
 
     # analyze frame
     bg = 800
@@ -70,6 +57,20 @@ def take_exposure_and_measure_star(cam, imgname, focus_expos):
 
     return find_hfd_from_1D(profile, thres=thres)
 
+def take_exposure_and_measure_star(cam, imgname, focus_expos):
+    global args, fig, fig2, ax_1d, ax_2d, ax_hfd, ax_hfd
+
+    if not args.simul:
+        logging.info(f'Taking exposure exposure = {focus_expos} seconds')
+        rc = sdi.take_exposure(cam, focus_expos, imgname)
+        logging.info(f'exposure result code = {rc}')
+
+    hdu = pyfits.open(imgname)
+    starimage_data = hdu[0].data.astype(float)
+    hdu.close()
+
+    return measure_frame(starimage_data)
+
 def move_focuser(focuser, pos):
     if not focuser.move_absolute_position(pos):
         logging.error("Focuser error!!")
@@ -82,7 +83,7 @@ def parse_commandline():
     parser.add_argument('focus_min', type=int, help='Lowest focus travel allowed')
     parser.add_argument('focus_max', type=int, help='Highest focus travel allowed')
     parser.add_argument('focus_dir', type=str, help='IN or OUT')
-    parser.add_argument('nruns', type=int, help='Number of vcurve runs')
+    #parser.add_argument('nruns', type=int, help='Number of vcurve runs')
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
     parser.add_argument('--focuser_driver', type=str,  help='Focuser Driver')
@@ -93,7 +94,6 @@ def parse_commandline():
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
 
     return parser.parse_args()
-
 
 if __name__ == '__main__':
     logging.basicConfig(filename='sample_vcurve.log',
@@ -115,6 +115,7 @@ if __name__ == '__main__':
 
     # connect focuser and camera
     if not args.simul:
+        from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
         sdi = SDI()
 
         sdi.connect_backend()
@@ -142,9 +143,9 @@ if __name__ == '__main__':
     # create plots if needed
     if args.debugplots:
         logging.info('Creating figure')
-        fig2 = plt.figure()
-        ax_hfd = fig2.add_subplot(111)
-        hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
+#        fig2 = plt.figure()
+#        ax_hfd = fig2.add_subplot(111)
+#        hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
 
         fig = plt.figure()
         ax_2d = fig.add_subplot(121)
@@ -152,13 +153,31 @@ if __name__ == '__main__':
 
     focus_expos = args.exposure_start
 
-    vcurve_rs =
-    vcurve_rp =
-    vcurve_ls =
-    vcurve_lp =
+    # vcurve parameters
+#    vcurve_rs = 0.04462570065893874
+#    vcurve_rp = 4.959828107421345
+#    vcurve_ls =-0.04565294355776672
+#    vcurve_lp =-4.848226361604247
 
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
-    rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    vcurve_rs = 0.049684986658347155
+    vcurve_rp = -6.715524350563101
+    vcurve_ls = -0.05181792218702318
+    vcurve_lp = 6.4390991317122825
+
+    if not args.simul:
+        fpos_1 = focuser.get_absolute_position()
+    else:
+        fpos_1 = 8000
+
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_1}.fit')
+    if not args.simul:
+        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    else:
+        fpos_1 = 8000
+        tmp_starimage_data = simul_star.get_simul_star_image(fpos_1)
+        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+        rc = measure_frame(tmp_starimage_data)
+
     if rc is None:
         logging.error('No star found!')
         sys.exit(1)
@@ -166,161 +185,296 @@ if __name__ == '__main__':
     scen, sl, sr, hfl, hfr, totflux = rc
     hfd_1 = hfr-hfl
 
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
-    rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    if args.debugplots:
+        fig.suptitle(f'First focus {fpos_1} HFD {hfd_1:5.2f}')
+        fig.show()
+        plt.pause(1)
+
+    # kind of redundant to take it again?
+    # take two measurements and see if one the right side of curve
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_1}.fit')
+    if not args.simul:
+        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    else:
+        fpos_1 = 8000
+        tmp_starimage_data = simul_star.get_simul_star_image(fpos_1)
+        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+        rc = measure_frame(tmp_starimage_data)
+
     if rc is None:
         logging.error('No star found!')
         sys.exit(1)
 
     scen, sl, sr, hfl, hfr, totflux = rc
     hfd_1 = hfr-hfl
-    fpos_1 = focuser.get_absolute_position()
-    logging.info(f'initial focus = {fpos_1}  HFD = {hfd_1}')
+    logging.info(f'INITIAL FOCUS = {fpos_1}  HFD = {hfd_1}')
 
     # move out 10 HFD
     nsteps = int(10/vcurve_rs)
     fpos_2 = fpos_1 + nsteps
     logging.info(f'Moving out to {fpos_2}')
 
-    move_focuser(focuser, fpos_2)
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_2}.fit')
+    if not args.simul:
+        move_focuser(focuser, fpos_2)
 
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
-    rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    else:
+        tmp_starimage_data = simul_star.get_simul_star_image(fpos_2)
+        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+        rc = measure_frame(tmp_starimage_data)
+
     if rc is None:
         logging.error('No star found!')
         sys.exit(1)
 
     scen, sl, sr, hfl, hfr, totflux = rc
     hfd_2 = hfr-hfl
-    logging.info(f'focus = {fpos_2}  HFD = {hfd_2}')
+    logging.info(f'SECOND FOCUS = {fpos_2}  HFD = {hfd_2}')
+
+    if args.debugplots:
+        fig.suptitle(f'Second focus {fpos_2} HFD {hfd_2:5.2f}')
+        fig.show()
+        plt.pause(1)
 
     # make sure hfd got larger
     if hfd_2 < hfd_1:
         logging.error('On wrong side of focus!')
         sys.exit(1)
 
+    # compute location for desired initial HFD
+    initial_hfd = 24
+    fpos_initial = fpos_2 + int((initial_hfd-hfd_2)/vcurve_rs)
+    logging.info(f'Initial HFD = {initial_hfd} pred focus = {fpos_initial}')
 
+    # figure out direction
+    backlash = 200
+    if args.focus_dir == 'OUT':
+        # start past desired start and move to it to remove backlash
+        fpos_pre_initial = fpos_initial - backlash
+    elif args.focus_dir == 'IN':
+        # start past desired start and move to it to remove backlash
+        fpos_pre_initial = fpos_initial + backlash
+    else:
+        logging.error(f'Unknown focus directin {args.focus_dir} - exitting!')
+        sys.exit(1)
 
-    focus_step = int((focus_end - focus_start)/(focus_nstep - 1))
-    logging.info(f'Focus ex {focus_start} to {focus_end} step {focus_step}')
-    fpos_arr = []
-    hfd_arr = []
-    for focus_pos in range(focus_start, focus_end+focus_step, focus_step):
-        logging.info(f'Moving to focus pos {focus_pos}')
-        imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_initial}.fit')
+    if not args.simul:
+        logging.info(f'Moving to pre spot {fpos_pre_initial}')
+        move_focuser(focuser, fpos_pre_initial)
 
-            if rc is not None:
-                scen, sl, sr, hfl, hfr, totflux = rc
-                if totflux >= args.starflux_min:
-                    break
-                else:
-                    logging.warning('Star flux in image {imgname} ({totflux} is less than {args.starflux_min}')
-            else:
-                logging.warning(f'No star found in image {imgname}')
+        # move out to initial HFD
+        logging.info(f'Moving to {fpos_initial}')
+        time.sleep(0.5)
+        move_focuser(focuser, fpos_initial)
 
-            focus_expos += 1
-            if not args.simul:
-                logging.info(f'Simulated image did not have star - check settings.')
-                sys.exit(1)
+        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    else:
+        tmp_starimage_data = simul_star.get_simul_star_image(fpos_initial)
+        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+        rc = measure_frame(tmp_starimage_data)
 
-            if focus_expos <= args.exposure_max:
-                logging.info(f'Bumping exposure to {focus_expos} and retrying')
-                continue
-            else:
-                logging.info(f'Exposure is already at max of {args.exposure_max} seconds - aborting')
-                sys.exit(1)
+    if rc is None:
+        logging.error('No star found!')
+        sys.exit(1)
 
-        fpos_arr.append(focus_pos)
-        hfd_arr.append(hfr-hfl)
+    scen, sl, sr, hfl, hfr, totflux = rc
+    hfd_initial = hfr-hfl
+
+    logging.info(f'INITIAL POSITION FOCUS = {fpos_initial}  HFD = {hfd_initial}')
+
+    if args.debugplots:
+        fig.suptitle(f'Initial position focus {fpos_initial} HFD {hfd_initial:5.2f}')
+        fig.show()
+        plt.pause(1)
+
+    # now take several measurements and get average HFD
+    avg_initial_hfd = 0
+    ninitial = 5
+    for i in range(0, ninitial):
+        imgname = os.path.join(imagesdir, f'vcurve_focuspos_initial{i:02d}_{fpos_initial}.fit')
+        if not args.simul:
+            rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+        else:
+            tmp_starimage_data = simul_star.get_simul_star_image(fpos_initial)
+            pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+            rc = measure_frame(tmp_starimage_data)
+
+        if rc is None:
+            logging.error('No star found!')
+            sys.exit(1)
+
+        scen, sl, sr, hfl, hfr, totflux = rc
+        avg_initial_hfd += hfr-hfl
 
         if args.debugplots:
-            hfd_plot.set_data(fpos_arr, hfd_arr)
-            ax_hfd.relim()
-            ax_hfd.autoscale_view()
-            fig2.canvas.draw()
-
-            ax_1d.axvline(scen, color='red')
-            if sl is not None and sr is not None:
-                ax_1d.axvline(sl, color='green')
-                ax_1d.axvline(sr, color='green')
-                ax_1d.axvline(hfl, color='blue')
-                ax_1d.axvline(hfr, color='blue')
-                delta = sr-sl
-                ax_1d.set_xlim(sl-delta/4, sr+delta/4)
-                ax_1d.set_title(f'{hfr-hfl:5.3f}')
-            print('drawing plot')
+            fig.suptitle(f'Initial pos iter #{i+1} focus {fpos_initial} HFD {hfr-hfl:5.2f} AVG:{avg_initial_hfd/(i+1):5.2f}')
             fig.show()
-            plt.pause(0.01)
+            plt.pause(1)
 
-        # write out
-        f = open(os.path.join(imagesdir, f'hfd_run_{iter+1:03d}.txt'), 'w')
-        for (ls, lp, rs, rp)  in fit_arr:
-            f.write(f'{ls}, {lp}, {rs}, {rp}\n')
-        f.close()
+    avg_initial_hfd /= ninitial
 
-        # fit
-        fpos_arr = np.array(fpos_arr)
-        hfd_arr = np.array(hfd_arr)
+    logging.info(f'INITIAL POSITION FOCUS AVERAGE HFD = {avg_initial_hfd}')
 
-        # sort so fpos is increasing
-        fargs = fpos_arr.argsort()
-        fpos_arr = fpos_arr[fargs]
-        hfd_arr = hfd_arr[fargs]
+    # now based on average at initial compute inner HFD location
+    # compute location for desired initial HFD
+    inner_hfd = 12
+    fpos_inner = fpos_2 + int((inner_hfd-hfd_2)/vcurve_rs)
+    logging.info(f'Inner HFD = {inner_hfd} pred focus = {fpos_inner}')
 
-        # find mininum value
-        midx = np.argmin(hfd_arr)
-        fpos_arr_l = np.array(fpos_arr[:midx-3])
-        fpos_arr_r = np.array(fpos_arr[midx+4:])
-        hfd_arr_l = np.array(hfd_arr[:midx-3])
-        hfd_arr_r = np.array(hfd_arr[midx+4:])
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_inner}.fit')
+    if not args.simul:
+        # move out to inner HFD
+        logging.info(f'Moving to {fpos_inner}')
+        time.sleep(0.5)
+        move_focuser(focuser, fpos_inner)
 
-        print('fpos_l', fpos_arr_l)
-        print('hfd_l', hfd_arr_l)
-        print('fpos_r', fpos_arr_r)
-        print('hfd_r', hfd_arr_r)
+        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    else:
+        tmp_starimage_data = simul_star.get_simul_star_image(fpos_inner)
+        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+        rc = measure_frame(tmp_starimage_data)
 
-        siegel_left_fit = siegelslopes(hfd_arr_l, fpos_arr_l)
-        siegel_right_fit = siegelslopes(hfd_arr_r, fpos_arr_r)
-        siegel_left_zero = -siegel_left_fit[1]/siegel_left_fit[0]
-        siegel_right_zero = -siegel_right_fit[1]/siegel_right_fit[0]
-        siegel_best_pos = (siegel_left_fit[1]-siegel_right_fit[1])/(siegel_right_fit[0]-siegel_left_fit[0])
-        logging.info(f'siegel left  fit = {siegel_left_fit}')
-        logging.info(f'siegel right fit = {siegel_right_fit}')
-        logging.info(f'siegel best pos  = {siegel_best_pos}')
+    if rc is None:
+        logging.error('No star found!')
+        sys.exit(1)
+
+    scen, sl, sr, hfl, hfr, totflux = rc
+    hfd_inner = hfr-hfl
+
+    logging.info(f'INNER POSITION FOCUS = {fpos_inner}  HFD = {hfd_inner}')
+
+    if args.debugplots:
+        fig.suptitle(f'Inner position focus {fpos_inner} HFD {hfd_inner:5.2f}')
+        fig.show()
+        plt.pause(1)
+
+    # now take several measurements and get average HFD
+    avg_inner_hfd = 0
+    ninner = 5
+    for i in range(0, ninitial):
+        imgname = os.path.join(imagesdir, f'vcurve_focuspos_inner{i:02d}_{fpos_initial}.fit')
+        if not args.simul:
+            rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+        else:
+            tmp_starimage_data = simul_star.get_simul_star_image(fpos_inner)
+            pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+            rc = measure_frame(tmp_starimage_data)
+
+        if rc is None:
+            logging.error('No star found!')
+            sys.exit(1)
+
+        scen, sl, sr, hfl, hfr, totflux = rc
+        avg_inner_hfd += hfr-hfl
 
         if args.debugplots:
-            ax_hfd.plot(fpos_arr_l, hfd_arr_l, marker='+', ls='', color='red')
-            ax_hfd.plot(fpos_arr_r, hfd_arr_r, marker='+', ls='', color='red')
-            ax_hfd.plot(fpos_arr[midx-5:], siegel_right_fit[0]*fpos_arr[midx-5:]+siegel_right_fit[1], color='green')
-            ax_hfd.plot(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1], color='blue')
-            ax_hfd.axvline(siegel_best_pos, color='red')
-            ax_hfd.set_title(f'Left {siegel_left_fit[0]:7.6f}/{siegel_best_pos - siegel_left_zero:5.3f} Right {siegel_right_fit[0]:7.6f}/{siegel_best_pos - siegel_right_zero:5.3f}')
-            ax_hfd.relim()
-            ax_hfd.set_ylim(bottom=0)
-            ax_hfd.autoscale_view()
-            fig2.canvas.draw()
-            plt.pause(0.1)
+            fig.suptitle(f'Inner pos iter #{i+1} focus {fpos_inner} HFD {hfr-hfl:5.2f} AVG:{avg_inner_hfd/(i+1):5.2f}')
+            fig.show()
+            plt.pause(1)
 
-        fit_arr.append((siegel_left_fit[0], siegel_best_pos - siegel_left_zero, siegel_right_fit[0], siegel_best_pos - siegel_right_zero))
+    avg_inner_hfd /= ninitial
 
-        print(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1])
+    logging.info(f'INNER POSITION FOCUS AVERAGE HFD = {avg_inner_hfd}')
 
-        logging.info('Left Side:')
-        logging.info(f'   slope: {siegel_left_fit[0]}')
-        logging.info(f'   inter: {siegel_left_fit[1]}')
-        logging.info(f'   yzero: {siegel_left_zero}')
-        logging.info(f'   PID  : {siegel_best_pos - siegel_left_zero}')
-        logging.info('Right Side:')
-        logging.info(f'   slope: {siegel_right_fit[0]}')
-        logging.info(f'   inter: {siegel_right_fit[1]}')
-        logging.info(f'   yzero: {siegel_right_zero}')
-        logging.info(f'   PID  : {siegel_best_pos - siegel_right_zero}')
+    # now compute best focus
+    fpos_best = fpos_inner - int(avg_inner_hfd/vcurve_rs) + vcurve_rp
 
-    f = open(os.path.join(imagesdir, 'vcurve_fits.txt'), 'w')
-    for (ls, lp, rs, rp)  in fit_arr:
-        f.write(f'{ls}, {lp}, {rs}, {rp}\n')
-    f.close()
+    logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_inner} {int(avg_inner_hfd/vcurve_rs)} {vcurve_rp}')
 
 
     if args.debugplots:
         plt.show()
+
+#        if args.debugplots:
+#            hfd_plot.set_data(fpos_arr, hfd_arr)
+#            ax_hfd.relim()
+#            ax_hfd.autoscale_view()
+#            fig2.canvas.draw()
+#
+#            ax_1d.axvline(scen, color='red')
+#            if sl is not None and sr is not None:
+#                ax_1d.axvline(sl, color='green')
+#                ax_1d.axvline(sr, color='green')
+#                ax_1d.axvline(hfl, color='blue')
+#                ax_1d.axvline(hfr, color='blue')
+#                delta = sr-sl
+#                ax_1d.set_xlim(sl-delta/4, sr+delta/4)
+#                ax_1d.set_title(f'{hfr-hfl:5.3f}')
+#            print('drawing plot')
+#            fig.show()
+#            plt.pause(0.01)
+#
+#        # write out
+#        f = open(os.path.join(imagesdir, f'hfd_run_{iter+1:03d}.txt'), 'w')
+#        for (ls, lp, rs, rp)  in fit_arr:
+#            f.write(f'{ls}, {lp}, {rs}, {rp}\n')
+#        f.close()
+#
+#        # fit
+#        fpos_arr = np.array(fpos_arr)
+#        hfd_arr = np.array(hfd_arr)
+#
+#        # sort so fpos is increasing
+#        fargs = fpos_arr.argsort()
+#        fpos_arr = fpos_arr[fargs]
+#        hfd_arr = hfd_arr[fargs]
+#
+#        # find mininum value
+#        midx = np.argmin(hfd_arr)
+#        fpos_arr_l = np.array(fpos_arr[:midx-3])
+#        fpos_arr_r = np.array(fpos_arr[midx+4:])
+#        hfd_arr_l = np.array(hfd_arr[:midx-3])
+#        hfd_arr_r = np.array(hfd_arr[midx+4:])
+#
+#        print('fpos_l', fpos_arr_l)
+#        print('hfd_l', hfd_arr_l)
+#        print('fpos_r', fpos_arr_r)
+#        print('hfd_r', hfd_arr_r)
+#
+#        siegel_left_fit = siegelslopes(hfd_arr_l, fpos_arr_l)
+#        siegel_right_fit = siegelslopes(hfd_arr_r, fpos_arr_r)
+#        siegel_left_zero = -siegel_left_fit[1]/siegel_left_fit[0]
+#        siegel_right_zero = -siegel_right_fit[1]/siegel_right_fit[0]
+#        siegel_best_pos = (siegel_left_fit[1]-siegel_right_fit[1])/(siegel_right_fit[0]-siegel_left_fit[0])
+#        logging.info(f'siegel left  fit = {siegel_left_fit}')
+#        logging.info(f'siegel right fit = {siegel_right_fit}')
+#        logging.info(f'siegel best pos  = {siegel_best_pos}')
+#
+#        if args.debugplots:
+#            ax_hfd.plot(fpos_arr_l, hfd_arr_l, marker='+', ls='', color='red')
+#            ax_hfd.plot(fpos_arr_r, hfd_arr_r, marker='+', ls='', color='red')
+#            ax_hfd.plot(fpos_arr[midx-5:], siegel_right_fit[0]*fpos_arr[midx-5:]+siegel_right_fit[1], color='green')
+#            ax_hfd.plot(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1], color='blue')
+#            ax_hfd.axvline(siegel_best_pos, color='red')
+#            ax_hfd.set_title(f'Left {siegel_left_fit[0]:7.6f}/{siegel_best_pos - siegel_left_zero:5.3f} Right {siegel_right_fit[0]:7.6f}/{siegel_best_pos - siegel_right_zero:5.3f}')
+#            ax_hfd.relim()
+#            ax_hfd.set_ylim(bottom=0)
+#            ax_hfd.autoscale_view()
+#            fig2.canvas.draw()
+#            plt.pause(0.1)
+#
+#        fit_arr.append((siegel_left_fit[0], siegel_best_pos - siegel_left_zero, siegel_right_fit[0], siegel_best_pos - siegel_right_zero))
+#
+#        print(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1])
+#
+#        logging.info('Left Side:')
+#        logging.info(f'   slope: {siegel_left_fit[0]}')
+#        logging.info(f'   inter: {siegel_left_fit[1]}')
+#        logging.info(f'   yzero: {siegel_left_zero}')
+#        logging.info(f'   PID  : {siegel_best_pos - siegel_left_zero}')
+#        logging.info('Right Side:')
+#        logging.info(f'   slope: {siegel_right_fit[0]}')
+#        logging.info(f'   inter: {siegel_right_fit[1]}')
+#        logging.info(f'   yzero: {siegel_right_zero}')
+#        logging.info(f'   PID  : {siegel_best_pos - siegel_right_zero}')
+#
+#    f = open(os.path.join(imagesdir, 'vcurve_fits.txt'), 'w')
+#    for (ls, lp, rs, rp)  in fit_arr:
+#        f.write(f'{ls}, {lp}, {rs}, {rp}\n')
+#    f.close()
+#
+#
+#    if args.debugplots:
+#        plt.show()
