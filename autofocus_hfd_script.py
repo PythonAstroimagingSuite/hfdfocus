@@ -85,6 +85,7 @@ def parse_commandline():
     parser.add_argument('focus_dir', type=str, help='IN or OUT')
     #parser.add_argument('nruns', type=int, help='Number of vcurve runs')
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
+    parser.add_argument('--debugplotsdelay', type=float, default=1, help='Delay (seconds) showing each plot')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
     parser.add_argument('--focuser_driver', type=str,  help='Focuser Driver')
     parser.add_argument('--camera_driver', type=str,  help='Camera Driver')
@@ -188,7 +189,7 @@ if __name__ == '__main__':
     if args.debugplots:
         fig.suptitle(f'First focus {fpos_1} HFD {hfd_1:5.2f}')
         fig.show()
-        plt.pause(1)
+        plt.pause(args.debugplotsdelay)
 
     # kind of redundant to take it again?
     # take two measurements and see if one the right side of curve
@@ -235,7 +236,7 @@ if __name__ == '__main__':
     if args.debugplots:
         fig.suptitle(f'Second focus {fpos_2} HFD {hfd_2:5.2f}')
         fig.show()
-        plt.pause(1)
+        plt.pause(args.debugplotsdelay)
 
     # make sure hfd got larger
     if hfd_2 < hfd_1:
@@ -287,7 +288,7 @@ if __name__ == '__main__':
     if args.debugplots:
         fig.suptitle(f'Initial position focus {fpos_initial} HFD {hfd_initial:5.2f}')
         fig.show()
-        plt.pause(1)
+        plt.pause(args.debugplotsdelay)
 
     # now take several measurements and get average HFD
     avg_initial_hfd = 0
@@ -311,7 +312,7 @@ if __name__ == '__main__':
         if args.debugplots:
             fig.suptitle(f'Initial pos iter #{i+1} focus {fpos_initial} HFD {hfr-hfl:5.2f} AVG:{avg_initial_hfd/(i+1):5.2f}')
             fig.show()
-            plt.pause(1)
+            plt.pause(args.debugplotsdelay)
 
     avg_initial_hfd /= ninitial
 
@@ -348,7 +349,7 @@ if __name__ == '__main__':
     if args.debugplots:
         fig.suptitle(f'Inner position focus {fpos_inner} HFD {hfd_inner:5.2f}')
         fig.show()
-        plt.pause(1)
+        plt.pause(args.debugplotsdelay)
 
     # now take several measurements and get average HFD
     avg_inner_hfd = 0
@@ -372,19 +373,45 @@ if __name__ == '__main__':
         if args.debugplots:
             fig.suptitle(f'Inner pos iter #{i+1} focus {fpos_inner} HFD {hfr-hfl:5.2f} AVG:{avg_inner_hfd/(i+1):5.2f}')
             fig.show()
-            plt.pause(1)
+            plt.pause(args.debugplotsdelay)
 
     avg_inner_hfd /= ninitial
 
     logging.info(f'INNER POSITION FOCUS AVERAGE HFD = {avg_inner_hfd}')
 
     # now compute best focus
-    fpos_best = fpos_inner - int(avg_inner_hfd/vcurve_rs) + vcurve_rp
+    fpos_best = int(fpos_inner - int(avg_inner_hfd/vcurve_rs) + vcurve_rp)
 
     logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_inner} {int(avg_inner_hfd/vcurve_rs)} {vcurve_rp}')
 
+    if fpos_best > args.focus_max or fpos_best > args.focus_min:
+        logging.error(f'Best focus position {fpos_best} is outside allowed range {args.focus_min} to {args.focus_max}')
+
+    if not args.simul:
+        logging.info(f'Moving to {fpos_best}')
+        move_focuser(focuser, fpos_best)
+        imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_best}.fit')
+
+        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    else:
+        tmp_starimage_data = simul_star.get_simul_star_image(fpos_best)
+        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+        rc = measure_frame(tmp_starimage_data)
+
+    if rc is None:
+        logging.error('No star found!')
+        if args.debugplots:
+            plt.show()
+        sys.exit(1)
+
+    scen, sl, sr, hfl, hfr, totflux = rc
+    best_hfd = hfr-hfl
+
+    logging.info(f'BEST FOCUS POSITION = {fpos_best} HFD = {best_hfd}')
 
     if args.debugplots:
+        fig.suptitle(f'Best pos focus {fpos_best} HFD {best_hfd:5.2f}')
+        fig.show()
         plt.show()
 
 #        if args.debugplots:
