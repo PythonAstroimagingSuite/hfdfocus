@@ -94,6 +94,7 @@ def parse_commandline():
 
     return parser.parse_args()
 
+
 if __name__ == '__main__':
     logging.basicConfig(filename='sample_vcurve.log',
                         filemode='w',
@@ -151,6 +152,52 @@ if __name__ == '__main__':
 
     focus_expos = args.exposure_start
 
+    vcurve_rs =
+    vcurve_rp =
+    vcurve_ls =
+    vcurve_lp =
+
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
+    rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    if rc is None:
+        logging.error('No star found!')
+        sys.exit(1)
+
+    scen, sl, sr, hfl, hfr, totflux = rc
+    hfd_1 = hfr-hfl
+
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
+    rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    if rc is None:
+        logging.error('No star found!')
+        sys.exit(1)
+
+    scen, sl, sr, hfl, hfr, totflux = rc
+    hfd_1 = hfr-hfl
+    fpos_1 = focuser.get_absolute_position()
+    logging.info(f'initial focus = {fpos_1}  HFD = {hfd_1}')
+
+    # move out 10 HFD
+    nsteps = int(10/vcurve_rs)
+    fpos_2 = fpos_1 + nsteps
+    logging.info(f'Moving out to {fpos_2}')
+
+    move_focuser(focuser, fpos_2)
+
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
+    rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    if rc is None:
+        logging.error('No star found!')
+        sys.exit(1)
+
+    scen, sl, sr, hfl, hfr, totflux = rc
+    hfd_2 = hfr-hfl
+    logging.info(f'focus = {fpos_2}  HFD = {hfd_2}')
+
+    # make sure hfd got larger
+    if hfd_2 < hfd_1:
+        logging.error('On wrong side of focus!')
+        sys.exit(1)
 
 
 
