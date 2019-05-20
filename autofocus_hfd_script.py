@@ -9,6 +9,8 @@ import astropy.io.fits as pyfits
 import numpy as np
 from scipy.stats import siegelslopes
 
+import matplotlib as mpl
+mpl.rc('font', size=8)
 import matplotlib.pyplot as plt
 
 ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
@@ -45,8 +47,9 @@ def measure_frame(starimage_data):
 
     if args.debugplots:
         fig.clear()
-        ax_2d = fig.add_subplot(121)
-        ax_1d = fig.add_subplot(122)
+        #mpl.rcParams.update({'axes.labelsize' : 18})
+        ax_1d = fig.add_subplot(121)
+        ax_2d = fig.add_subplot(122)
         im = ax_2d.imshow((crop_data-bg).astype(float))
         fig.colorbar(im, ax=ax_2d)
 
@@ -148,9 +151,10 @@ if __name__ == '__main__':
 #        ax_hfd = fig2.add_subplot(111)
 #        hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
 
-        fig = plt.figure()
-        ax_2d = fig.add_subplot(121)
-        ax_1d = fig.add_subplot(122)
+
+        fig = plt.figure(figsize=(4.5,2))
+        ax_1d = fig.add_subplot(121)
+        ax_2d = fig.add_subplot(122)
 
     focus_expos = args.exposure_start
 
@@ -310,7 +314,8 @@ if __name__ == '__main__':
         avg_initial_hfd += hfr-hfl
 
         if args.debugplots:
-            fig.suptitle(f'Initial pos iter #{i+1} focus {fpos_initial} HFD {hfr-hfl:5.2f} AVG:{avg_initial_hfd/(i+1):5.2f}')
+            fig.suptitle(f'Initial pos iter #{i+1} focus {fpos_initial} ' \
+                         f'HFD {hfr-hfl:5.2f} AVG:{avg_initial_hfd/(i+1):5.2f}')
             fig.show()
             plt.pause(args.debugplotsdelay)
 
@@ -371,7 +376,8 @@ if __name__ == '__main__':
         avg_inner_hfd += hfr-hfl
 
         if args.debugplots:
-            fig.suptitle(f'Inner pos iter #{i+1} focus {fpos_inner} HFD {hfr-hfl:5.2f} AVG:{avg_inner_hfd/(i+1):5.2f}')
+            fig.suptitle(f'Inner pos iter #{i+1} focus {fpos_inner} ' \
+                         f'HFD {hfr-hfl:5.2f} AVG:{avg_inner_hfd/(i+1):5.2f}')
             fig.show()
             plt.pause(args.debugplotsdelay)
 
