@@ -38,6 +38,10 @@ def parse_commandline():
     parser.add_argument('--simul', action='store_true', help='Simulate star')
     parser.add_argument('--focuser_driver', type=str,  help='Focuser Driver')
     parser.add_argument('--camera_driver', type=str,  help='Camera Driver')
+    parser.add_argument('--exposure_start', default=1, type=int,  help='Starting exposure value')
+    parser.add_argument('--exposure_min', default=1, type=int,  help='Minimum exposure value')
+    parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
+    parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
 
     return parser.parse_args()
 
@@ -134,7 +138,7 @@ if __name__ == '__main__':
             ax_2d = fig.add_subplot(121)
             ax_1d = fig.add_subplot(122)
 
-        focus_expos = 1
+        focus_expos = args.exposure_start
         focus_step = int((focus_end - focus_start)/(focus_nstep - 1))
         logging.info(f'Focus run from {focus_start} to {focus_end} step {focus_step}')
         fpos_arr = []
@@ -142,56 +146,72 @@ if __name__ == '__main__':
         for focus_pos in range(focus_start, focus_end+focus_step, focus_step):
             logging.info(f'Moving to focus pos {focus_pos}')
             imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
-            if not args.simul:
-                if not focuser.move_absolute_position(focus_pos):
-                    logging.error("Focuser error!!")
+            while True:
+                if not args.simul:
+                    if not focuser.move_absolute_position(focus_pos):
+                        logging.error("Focuser error!!")
+                        sys.exit(1)
+
+                    sdi.wait_on_focuser_move(focuser)
+
+                    logging.info(f'Taking exposure exposure = {focus_expos} seconds')
+                    rc = sdi.take_exposure(cam, focus_expos, imgname)
+                    logging.info(f'exposure result code = {rc}')
+
+                else:
+                    tmp_starimage_data = simul_star.get_simul_star_image(focus_pos)
+                    pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+
+                hdu = pyfits.open(imgname)
+                starimage_data = hdu[0].data.astype(float)
+                hdu.close()
+
+                # analyze frame
+                bg = 800
+                thres = 10000
+
+                xcen, ycen, bg, mad = find_star(starimage_data, debugfits=True)
+
+                win = 100
+                xlow = int(xcen-win/2)
+                xhi = int(xcen+win/2)
+                ylow = int(ycen-win/2)
+                yhi = int(ycen+win/2)
+                crop_data = starimage_data[ylow:yhi, xlow:xhi]
+
+                if args.debugplots:
+                    fig.clear()
+                    ax_2d = fig.add_subplot(121)
+                    ax_1d = fig.add_subplot(122)
+                    im = ax_2d.imshow((crop_data-bg).astype(float))
+                    fig.colorbar(im, ax=ax_2d)
+
+                profile = horiz_bin_window(crop_data, bg=bg)
+
+                if args.debugplots:
+                    ax_1d.plot(profile)
+
+                rc = find_hfd_from_1D(profile, thres=thres)
+                if rc is not None:
+                    scen, sl, sr, hfl, hfr, totflux = rc
+                    if totflux >= args.starflux_min:
+                        break
+                    else:
+                        logging.warning('Star flux in image {imgname} ({totflux} is less than {args.starflux_min}')
+                else:
+                    logging.warning(f'No star found in image {imgname}')
+
+                focus_expos += 1
+                if not args.simul:
+                    logging.info(f'Simulated image did not have star - check settings.')
                     sys.exit(1)
 
-                sdi.wait_on_focuser_move(focuser)
-
-                logging.info('Taking exposure')
-                rc = sdi.take_exposure(cam, focus_expos, imgname)
-                logging.info(f'exposure result code = {rc}')
-
-            else:
-                tmp_starimage_data = simul_star.get_simul_star_image(focus_pos)
-                pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-
-            hdu = pyfits.open(imgname)
-            starimage_data = hdu[0].data.astype(float)
-            hdu.close()
-
-            # analyze frame
-            bg = 800
-            thres = 10000
-
-            xcen, ycen, bg, mad = find_star(starimage_data, debugfits=True)
-
-            win = 100
-            xlow = int(xcen-win/2)
-            xhi = int(xcen+win/2)
-            ylow = int(ycen-win/2)
-            yhi = int(ycen+win/2)
-            crop_data = starimage_data[ylow:yhi, xlow:xhi]
-
-            if args.debugplots:
-                fig.clear()
-                ax_2d = fig.add_subplot(121)
-                ax_1d = fig.add_subplot(122)
-                im = ax_2d.imshow((crop_data-bg).astype(float))
-                fig.colorbar(im, ax=ax_2d)
-
-            profile = horiz_bin_window(crop_data, bg=bg)
-
-            if args.debugplots:
-                ax_1d.plot(profile)
-
-            rc = find_hfd_from_1D(profile, thres=thres)
-            if rc is None:
-                logging.error('No star found in image {imgname} - aborting!')
-                sys.exit(1)
-
-            scen, sl, sr, hfl, hfr = rc
+                if focus_expos <= args.exposure_max:
+                    logging.info(f'Bumping exposure to {focus_expos} and retrying')
+                    continue
+                else:
+                    logging.info(f'Exposure is already at max of {args.exposure_max} seconds - aborting')
+                    sys.exit(1)
 
             fpos_arr.append(focus_pos)
             hfd_arr.append(hfr-hfl)

@@ -560,7 +560,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
         ax_3.plot(r_arr, flux2_vs_r)
         ax_3.axvline(half_flux_r, color='green')
 
-    return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r)
+    return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r, totflux)
 
 def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
     logging.info(f'find_brightest_star_HFD: debugfits = {debugfits}')
