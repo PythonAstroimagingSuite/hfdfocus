@@ -94,11 +94,11 @@ if __name__ == '__main__':
 
     if args.debugplots:
         logging.info('Creating figure')
-        fig2 = plt.figure()
+        fig2 = plt.figure(figsize=(4,3))
         ax_hfd = fig2.add_subplot(111)
         hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(4,3))
         ax_2d = fig.add_subplot(121)
         ax_1d = fig.add_subplot(122)
 
@@ -144,7 +144,7 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             sdi.wait_on_focuser_move(focuser)
-            
+
         focus_expos = args.exposure_start
         focus_step = int((focus_end - focus_start)/(focus_nstep - 1))
         logging.info(f'Focus run from {focus_start} to {focus_end} step {focus_step}')
@@ -165,6 +165,16 @@ if __name__ == '__main__':
                     # just take full frame then shrink
                     roi = None
 
+                    if args.framesize != 0:
+                        w, h = cam.get_size()
+                        xl = int(w/2-args.framesize/2)
+                        xw = args.framesize
+                        yt = int(h/2-args.framesize/2)
+                        yh = args.framesize
+                        roi = (xl, yt, xw, yh)
+                    else:
+                        roi = None
+
                     logging.info(f'Taking exposure exposure = {focus_expos} seconds roi = {roi}')
 
                     rc = sdi.take_exposure(cam, focus_expos, imgname, roi=roi)
@@ -180,16 +190,16 @@ if __name__ == '__main__':
                 hdu.close()
 
                 # use subframe
-                if not args.simul and args.framesize != 0:
-                    w, h = cam.get_size()
-                    xl = int(w/2-args.framesize/2)
-                    xw = args.framesize
-                    yt = int(h/2-args.framesize/2)
-                    yh = args.framesize
-                    logging.info(f'Shrinking to framesize = {args.framesize}')
-                    starimage_data = starimage_data[yt:yt+yh, xl:xl+xw]
-                    print(starimage_data.shape)
-                    pyfits.writeto('starimage_data.fits', starimage_data.astype(float), overwrite=True)
+#                if not args.simul and args.framesize != 0:
+#                    w, h = cam.get_size()
+#                    xl = int(w/2-args.framesize/2)
+#                    xw = args.framesize
+#                    yt = int(h/2-args.framesize/2)
+#                    yh = args.framesize
+#                    logging.info(f'Shrinking to framesize = {args.framesize}')
+#                    starimage_data = starimage_data[yt:yt+yh, xl:xl+xw]
+#                    print(starimage_data.shape)
+#                    pyfits.writeto('starimage_data.fits', starimage_data.astype(float), overwrite=True)
 
                 # analyze frame
                 bg = 800
@@ -281,7 +291,7 @@ if __name__ == '__main__':
         # set new focus center to min
         focus_center = fpos_arr[midx]
         logging.info(f'Set new focus center to {focus_center}')
-        
+
         fpos_arr_l = np.array(fpos_arr[:midx-3])
         fpos_arr_r = np.array(fpos_arr[midx+4:])
         hfd_arr_l = np.array(hfd_arr[:midx-3])
@@ -329,10 +339,13 @@ if __name__ == '__main__':
         logging.info(f'   yzero: {siegel_right_zero}')
         logging.info(f'   PID  : {siegel_best_pos - siegel_right_zero}')
 
-    f = open(os.path.join(imagesdir, 'vcurve_fits.txt'), 'w')
-    for (ls, lp, rs, rp)  in fit_arr:
+        f = open(os.path.join(imagesdir, 'vcurve_fits.txt'), 'a')
+        ls = siegel_left_fit[0]
+        lp = siegel_best_pos - siegel_left_zero
+        rs = siegel_right_fit[0]
+        rp = siegel_best_pos - siegel_right_zero
         f.write(f'{ls}, {lp}, {rs}, {rp}\n')
-    f.close()
+        f.close()
 
 
     if args.debugplots:
