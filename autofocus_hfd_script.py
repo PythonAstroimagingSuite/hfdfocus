@@ -207,6 +207,8 @@ if __name__ == '__main__':
 
     if rc is None:
         logging.error('No star found!')
+        if args.debugplots:
+            plt.show()
         sys.exit(1)
 
     scen, sl, sr, hfl, hfr, totflux = rc
