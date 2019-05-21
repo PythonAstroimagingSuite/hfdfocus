@@ -108,6 +108,7 @@ if __name__ == '__main__':
 
     focus_center = args.focus_center
     focus_range = args.focus_range
+    focus_expos = args.exposure_start
     for iter in range(0, args.nruns):
         if args.debugplots:
             if iter != 0:
@@ -149,7 +150,6 @@ if __name__ == '__main__':
 
             sdi.wait_on_focuser_move(focuser)
 
-        focus_expos = args.exposure_start
         focus_step = int((focus_end - focus_start)/(focus_nstep - 1))
         logging.info(f'Focus run from {focus_start} to {focus_end} step {focus_step}')
         fpos_arr = []
@@ -206,10 +206,14 @@ if __name__ == '__main__':
 #                    pyfits.writeto('starimage_data.fits', starimage_data.astype(float), overwrite=True)
 
                 # analyze frame
-                bg = 800
-                thres = 10000
+                #bg = 800
+                #thres = 10000
 
                 xcen, ycen, bg, mad, starmask = find_star(starimage_data, debugfits=True)
+
+                thres = bg + 15*mad
+
+                logging.info(f'Using thres = {thres}')
 
                 if np.max(starimage_data[starmask] > args.saturation):
                     logging.warning(f'SATURATED PIXELS DETECTED!')
