@@ -185,7 +185,7 @@ if __name__ == '__main__':
 #    vcurve_ls =-0.04565294355776672
 #    vcurve_lp =-4.848226361604247
 
-
+    # from 2019/05/20 C8 @ f/7 - seemed to work well with L filter (only tested)
     vcurve_rs = 0.04472660490995652
     vcurve_rp = 5.333072819832182
     vcurve_ls = -0.045806498798410436
@@ -230,6 +230,8 @@ if __name__ == '__main__':
 
     if rc is None:
         logging.error('No star found!')
+        if args.debugplots:
+            plt.show()
         sys.exit(1)
 
     scen, sl, sr, hfl, hfr, totflux = rc
@@ -253,6 +255,8 @@ if __name__ == '__main__':
 
     if rc is None:
         logging.error('No star found!')
+        if args.debugplots:
+            plt.show()
         sys.exit(1)
 
     scen, sl, sr, hfl, hfr, totflux = rc
@@ -304,6 +308,8 @@ if __name__ == '__main__':
 
     if rc is None:
         logging.error('No star found!')
+        if args.debugplots:
+            plt.show()
         sys.exit(1)
 
     scen, sl, sr, hfl, hfr, totflux = rc
@@ -330,6 +336,8 @@ if __name__ == '__main__':
 
         if rc is None:
             logging.error('No star found!')
+            if args.debugplots:
+                plt.show()
             sys.exit(1)
 
         scen, sl, sr, hfl, hfr, totflux = rc
@@ -366,6 +374,8 @@ if __name__ == '__main__':
 
     if rc is None:
         logging.error('No star found!')
+        if args.debugplots:
+            plt.show()
         sys.exit(1)
 
     scen, sl, sr, hfl, hfr, totflux = rc
@@ -392,6 +402,8 @@ if __name__ == '__main__':
 
         if rc is None:
             logging.error('No star found!')
+            if args.debugplots:
+                plt.show()
             sys.exit(1)
 
         scen, sl, sr, hfl, hfr, totflux = rc
@@ -441,95 +453,3 @@ if __name__ == '__main__':
         fig.suptitle(f'Best pos focus {fpos_best} HFD {best_hfd:5.2f}')
         fig.show()
         plt.show()
-
-#        if args.debugplots:
-#            hfd_plot.set_data(fpos_arr, hfd_arr)
-#            ax_hfd.relim()
-#            ax_hfd.autoscale_view()
-#            fig2.canvas.draw()
-#
-#            ax_1d.axvline(scen, color='red')
-#            if sl is not None and sr is not None:
-#                ax_1d.axvline(sl, color='green')
-#                ax_1d.axvline(sr, color='green')
-#                ax_1d.axvline(hfl, color='blue')
-#                ax_1d.axvline(hfr, color='blue')
-#                delta = sr-sl
-#                ax_1d.set_xlim(sl-delta/4, sr+delta/4)
-#                ax_1d.set_title(f'{hfr-hfl:5.3f}')
-#            print('drawing plot')
-#            fig.show()
-#            plt.pause(0.01)
-#
-#        # write out
-#        f = open(os.path.join(imagesdir, f'hfd_run_{iter+1:03d}.txt'), 'w')
-#        for (ls, lp, rs, rp)  in fit_arr:
-#            f.write(f'{ls}, {lp}, {rs}, {rp}\n')
-#        f.close()
-#
-#        # fit
-#        fpos_arr = np.array(fpos_arr)
-#        hfd_arr = np.array(hfd_arr)
-#
-#        # sort so fpos is increasing
-#        fargs = fpos_arr.argsort()
-#        fpos_arr = fpos_arr[fargs]
-#        hfd_arr = hfd_arr[fargs]
-#
-#        # find mininum value
-#        midx = np.argmin(hfd_arr)
-#        fpos_arr_l = np.array(fpos_arr[:midx-3])
-#        fpos_arr_r = np.array(fpos_arr[midx+4:])
-#        hfd_arr_l = np.array(hfd_arr[:midx-3])
-#        hfd_arr_r = np.array(hfd_arr[midx+4:])
-#
-#        print('fpos_l', fpos_arr_l)
-#        print('hfd_l', hfd_arr_l)
-#        print('fpos_r', fpos_arr_r)
-#        print('hfd_r', hfd_arr_r)
-#
-#        siegel_left_fit = siegelslopes(hfd_arr_l, fpos_arr_l)
-#        siegel_right_fit = siegelslopes(hfd_arr_r, fpos_arr_r)
-#        siegel_left_zero = -siegel_left_fit[1]/siegel_left_fit[0]
-#        siegel_right_zero = -siegel_right_fit[1]/siegel_right_fit[0]
-#        siegel_best_pos = (siegel_left_fit[1]-siegel_right_fit[1])/(siegel_right_fit[0]-siegel_left_fit[0])
-#        logging.info(f'siegel left  fit = {siegel_left_fit}')
-#        logging.info(f'siegel right fit = {siegel_right_fit}')
-#        logging.info(f'siegel best pos  = {siegel_best_pos}')
-#
-#        if args.debugplots:
-#            ax_hfd.plot(fpos_arr_l, hfd_arr_l, marker='+', ls='', color='red')
-#            ax_hfd.plot(fpos_arr_r, hfd_arr_r, marker='+', ls='', color='red')
-#            ax_hfd.plot(fpos_arr[midx-5:], siegel_right_fit[0]*fpos_arr[midx-5:]+siegel_right_fit[1], color='green')
-#            ax_hfd.plot(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1], color='blue')
-#            ax_hfd.axvline(siegel_best_pos, color='red')
-#            ax_hfd.set_title(f'Left {siegel_left_fit[0]:7.6f}/{siegel_best_pos - siegel_left_zero:5.3f} Right {siegel_right_fit[0]:7.6f}/{siegel_best_pos - siegel_right_zero:5.3f}')
-#            ax_hfd.relim()
-#            ax_hfd.set_ylim(bottom=0)
-#            ax_hfd.autoscale_view()
-#            fig2.canvas.draw()
-#            plt.pause(0.1)
-#
-#        fit_arr.append((siegel_left_fit[0], siegel_best_pos - siegel_left_zero, siegel_right_fit[0], siegel_best_pos - siegel_right_zero))
-#
-#        print(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1])
-#
-#        logging.info('Left Side:')
-#        logging.info(f'   slope: {siegel_left_fit[0]}')
-#        logging.info(f'   inter: {siegel_left_fit[1]}')
-#        logging.info(f'   yzero: {siegel_left_zero}')
-#        logging.info(f'   PID  : {siegel_best_pos - siegel_left_zero}')
-#        logging.info('Right Side:')
-#        logging.info(f'   slope: {siegel_right_fit[0]}')
-#        logging.info(f'   inter: {siegel_right_fit[1]}')
-#        logging.info(f'   yzero: {siegel_right_zero}')
-#        logging.info(f'   PID  : {siegel_best_pos - siegel_right_zero}')
-#
-#    f = open(os.path.join(imagesdir, 'vcurve_fits.txt'), 'w')
-#    for (ls, lp, rs, rp)  in fit_arr:
-#        f.write(f'{ls}, {lp}, {rs}, {rp}\n')
-#    f.close()
-#
-#
-#    if args.debugplots:
-#        plt.show()
