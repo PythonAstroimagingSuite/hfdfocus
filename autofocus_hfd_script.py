@@ -36,7 +36,10 @@ def measure_frame(starimage_data):
     bg = 800
     thres = 10000
 
-    xcen, ycen, bg, mad = find_star(starimage_data, debugfits=True)
+    xcen, ycen, bg, mad, starmask = find_star(starimage_data, debugfits=True)
+
+    if np.max(starimage_data[starmask] > args.saturation):
+        logging.warning(f'SATURATED PIXELS DETECTED!')
 
     win = args.winsize
     xlow = int(xcen-win/2)
@@ -111,6 +114,7 @@ def parse_commandline():
     parser.add_argument('--exposure_min', default=1, type=int,  help='Minimum exposure value')
     parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
+    parser.add_argument('--saturation', default=55000, type=int,  help='Saturation level for sensor')
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     parser.add_argument('--winsize', default=250, type=int,  help='Size of window used to analyze star')
 

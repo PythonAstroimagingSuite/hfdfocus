@@ -41,6 +41,7 @@ def parse_commandline():
     parser.add_argument('--exposure_start', default=1, type=int,  help='Starting exposure value')
     parser.add_argument('--exposure_min', default=1, type=int,  help='Minimum exposure value')
     parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
+    parser.add_argument('--saturation', default=55000, type=int,  help='Saturation level for sensor')
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     parser.add_argument('--runoffset', default=0, type=int,  help='Shift center of run by this amount')
@@ -207,7 +208,10 @@ if __name__ == '__main__':
                 bg = 800
                 thres = 10000
 
-                xcen, ycen, bg, mad = find_star(starimage_data, debugfits=True)
+                xcen, ycen, bg, mad, starmask = find_star(starimage_data, debugfits=True)
+
+                if np.max(starimage_data[starmask] > args.saturation):
+                    logging.warning(f'SATURATED PIXELS DETECTED!')
 
                 win = 300
                 xlow = int(xcen-win/2)

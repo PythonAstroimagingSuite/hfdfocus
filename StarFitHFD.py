@@ -187,6 +187,10 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
             max_pix = npix
             max_l = l
 
+    if max_l is None:
+        logging.error('find_star(): no object found')
+        return None
+
     star_boxes[max_l] = 1
 
     if debugfits:
@@ -212,7 +216,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
 
     logging.info(f'find_star took {ttot_e-ttot_s} seconds')
 
-    return cx, cy, bglevel, bgmad
+    return cx, cy, bglevel, bgmad, star_boxes
 
 
 # horizontal bin data to form a 1D star profile
@@ -406,7 +410,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
 
 def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
     logging.info(f'find_brightest_star_HFD: debugfits = {debugfits}')
-    xcen, ycen, bg, noise = find_star(image_data, debugfits=debugfits)
+    xcen, ycen, bg, noise, starmask = find_star(image_data, debugfits=debugfits)
 
     img_ht, img_wd = image_data.shape
 
