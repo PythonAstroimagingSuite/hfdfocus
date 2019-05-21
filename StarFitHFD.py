@@ -83,23 +83,21 @@ def find_centroid(image_data, thres):
 
 def find_star(image_data, bgfact=50, satur=50000, window=100,
               starmodel=False, bgmodel=False, debugfits=False):
-    logging.info(f'find_star: debugfits = {debugfits}')
-
-    logging.info(f'find_stars start: bgfact={bgfact} window={window}')
+    logging.debug(f'find_stars start: bgfact={bgfact} window={window}')
 
     if debugfits:
         pyfits.writeto('thres_test.fits', image_data.astype(float), overwrite=True)
 
     ttot_s = time.time()
     if bgmodel:
-        logging.info('compute_bg_model START')
+        logging.debug('compute_bg_model START')
         ts = time.time()
         bgmodel = compute_bg_model(image_data, 100)
         te = time.time()
-        logging.info(f'compute_bg_model DONE took {te-ts} seconds')
+        logging.debug(f'compute_bg_model DONE took {te-ts} seconds')
     else:
         bg = compute_median(image_data)
-        logging.info(f'using constant bg model = {bg}')
+        logging.debug(f'using constant bg model = {bg}')
         bgmodel = np.full(image_data.shape, bg)
 
     if debugfits:
@@ -115,7 +113,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     ht, wd = bgrem_data.shape
     bg_window = 100
 
-    logging.info('computing star_model START')
+    logging.debug('computing star_model START')
     ts = time.time()
     star_model = np.zeros_like(bgrem_data)
     if starmodel:
@@ -135,11 +133,11 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
                 star_model[yl:ym, xl:xm] = bgrem_data[yl:ym, xl:xm] > thres
     else:
         thres = compute_median(bgrem_data) + bgfact*compute_noise_level(bgrem_data)
-        logging.info(f'Using constant thres for star model = {thres}')
+        logging.debug(f'Using constant thres for star model = {thres}')
         star_model = bgrem_data > thres
 
     te = time.time()
-    logging.info(f'computing star_model DONE took {te-ts} seconds')
+    logging.debug(f'computing star_model DONE took {te-ts} seconds')
 
     if debugfits:
         pyfits.writeto(f'star_model_bgfact{bgfact}.fits', star_model.astype(float), overwrite=True)
@@ -147,13 +145,13 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     # use dilation to stregthen any structures
     ndilate = 3
     tmp_image = star_model
-    logging.info(f'dilating star_model {ndilate} times')
+    logging.debug(f'dilating star_model {ndilate} times')
     ts = time.time()
     for i in range(0, ndilate):
         #tmp_image = ndimage.grey_dilation(tmp_image, size=(3,3))
         tmp_image = ndimage.binary_dilation(tmp_image, np.ones((3,3)))
     te = time.time()
-    logging.info(f'computing dilation took {te-ts} seconds')
+    logging.debug(f'computing dilation took {te-ts} seconds')
 
     dilate_star_model = tmp_image
     if debugfits:
@@ -166,7 +164,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     if debugfits:
         pyfits.writeto(f'star_label.fits', star_label.astype(float), overwrite=True)
 
-    logging.info('Finding stars with >= 9 pix START')
+    logging.debug('Finding stars with >= 9 pix START')
     star_boxes = np.zeros_like(star_model)
     max_pix = 0
     max_l = None
@@ -197,7 +195,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
         pyfits.writeto(f'star_boxes.fits', star_boxes.astype(float), overwrite=True)
 
     cy, cx = ndimage.measurements.center_of_mass(star_boxes)
-    logging.info(f'COM cx, cy = {cx}, {cy}')
+    logging.debug(f'COM cx, cy = {cx}, {cy}')
 
     # compute background near star
     #
@@ -210,11 +208,11 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     bglevel = np.median(data)
     data = bgrem_data[yl:ym, xl:xm]
     bgmad = compute_noise_level(data)
-    logging.info(f'bg = {bglevel} mad = {bgmad}')
+    logging.debug(f'bg = {bglevel} mad = {bgmad}')
 
     ttot_e = time.time()
 
-    logging.info(f'find_star took {ttot_e-ttot_s} seconds')
+    logging.debug(f'find_star took {ttot_e-ttot_s} seconds')
 
     return cx, cy, bglevel, bgmad, star_boxes
 
@@ -307,12 +305,12 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
 
     #lidx, ridx = find_star_limits(profile, thres)
     lidx, ridx = find_star_limits_robust(profile, thres)
-    logging.info(f'left, right = {lidx}, {ridx}')
+    logging.debug(f'left, right = {lidx}, {ridx}')
     if lidx is None or ridx is None:
         return None
 
     cidx = np.sum(idx[lidx:ridx]*profile[lidx:ridx])/np.sum(profile[lidx:ridx])
-    logging.info(f'center = {cidx}')
+    logging.debug(f'center = {cidx}')
 
     # find left, right limits
     # invert profile as y as a function of x on left and right
@@ -359,11 +357,11 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
 
     # now find flux inside left/right
     simple_totflux = np.sum([profile[lidx:ridx]])
-    logging.info(f'flux in star (simple) = {simple_totflux}')
+    logging.debug(f'flux in star (simple) = {simple_totflux}')
 
     totflux = flux2(proffunc, lx, rx)
     #print('integrated flux in star = ', flux(proffunc, lidx, ridx))
-    logging.info(f'integrated flux in star = {totflux}')
+    logging.debug(f'integrated flux in star = {totflux}')
 
     # compute flux as function of distance from center
     r_max = min(cidx-lx, rx-cidx)
@@ -398,7 +396,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
 
     half_flux_r = flux_inv(totflux/2)
 
-    logging.info(f'half flux rad = {half_flux_r}')
+    logging.debug(f'half flux rad = {half_flux_r}')
     #print(r_arr)
     #print(flux_vs_r)
     #print(flux2_vs_r)
@@ -409,7 +407,6 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r, totflux)
 
 def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
-    logging.info(f'find_brightest_star_HFD: debugfits = {debugfits}')
     xcen, ycen, bg, noise, starmask = find_star(image_data, debugfits=debugfits)
 
     img_ht, img_wd = image_data.shape
@@ -429,8 +426,8 @@ def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, 
 
     profile = horiz_bin_window(crop_data, bg=bg)
 
-    logging.info(f'thres = {thres}')
-    logging.info(f'profile = {profile}')
+    logging.debug(f'thres = {thres}')
+    logging.debug(f'profile = {profile}')
 
     if debugplots:
         ax_1d.plot(profile)

@@ -45,6 +45,7 @@ def parse_commandline():
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     parser.add_argument('--runoffset', default=0, type=int,  help='Shift center of run by this amount')
+    parser.add_argument('--hfdcutoff', default=10, type=float,  help='Ignore points with HFD less than this value')
 
     return parser.parse_args()
 
@@ -97,7 +98,7 @@ if __name__ == '__main__':
         logging.info('Creating figure')
         fig2 = plt.figure(figsize=(4,3))
         ax_hfd = fig2.add_subplot(111)
-        hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
+        hfd_plot, = ax_hfd.plot([],[], marker='o', fillstyle='none', ls='')
 
         fig = plt.figure(figsize=(4,3))
         ax_2d = fig.add_subplot(121)
@@ -300,10 +301,18 @@ if __name__ == '__main__':
         focus_center = fpos_arr[midx]
         logging.info(f'Set new focus center to {focus_center}')
 
-        fpos_arr_l = np.array(fpos_arr[:midx-3])
-        fpos_arr_r = np.array(fpos_arr[midx+4:])
-        hfd_arr_l = np.array(hfd_arr[:midx-3])
-        hfd_arr_r = np.array(hfd_arr[midx+4:])
+        fpos_arr_l = np.array(fpos_arr[:midx-2])
+        fpos_arr_r = np.array(fpos_arr[midx+3:])
+        hfd_arr_l = np.array(hfd_arr[:midx-2])
+        hfd_arr_r = np.array(hfd_arr[midx+3:])
+
+        # apply threshold
+        l_hfd_filter = np.where(hfd_arr_l > args.hfdcutoff)
+        r_hfd_filter = np.where(hfd_arr_r > args.hfdcutoff)
+        fpos_arr_l = fpos_arr_l[l_hfd_filter]
+        fpos_arr_r = fpos_arr_r[r_hfd_filter]
+        hfd_arr_l = hfd_arr_l[l_hfd_filter]
+        hfd_arr_r = hfd_arr_r[r_hfd_filter]
 
         print('fpos_l', fpos_arr_l)
         print('hfd_l', hfd_arr_l)

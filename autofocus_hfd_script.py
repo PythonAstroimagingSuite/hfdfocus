@@ -30,8 +30,6 @@ from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 from c8_simul_star import C8_F7_Star_Simulator
 
 def measure_frame(starimage_data):
-    global args, fig, fig2, ax_1d, ax_2d, ax_hfd, ax_hfd
-
     # analyze frame
     bg = 800
     thres = 10000
@@ -61,11 +59,15 @@ def measure_frame(starimage_data):
     if args.debugplots:
         ax_1d.plot(profile)
 
-    return find_hfd_from_1D(profile, thres=thres)
+    rc = find_hfd_from_1D(profile, thres=thres)
 
-def take_exposure_and_measure_star(cam, imgname, focus_expos):
-    global args, fig, fig2, ax_1d, ax_2d, ax_hfd, ax_hfd
+    if rc is not None:
+        scen, sl, sr, hfl, hfr, totflux = rc
+        return hfr-hfl
+    else:
+        return None
 
+def take_exposure_and_measure_star(imgname, focus_expos):
     if not args.simul:
         if args.framesize != 0:
             w, h = cam.get_size()
@@ -92,19 +94,76 @@ def take_exposure_and_measure_star(cam, imgname, focus_expos):
 
     return measure_frame(starimage_data)
 
-def move_focuser(focuser, pos):
+def move_focuser(pos):
+    if pos > args.focus_max or pos < args.focus_min:
+        logging.error(f'Requested focus position {pos} is outside allowed range {args.focus_min} to {args.focus_max}!!!')
+        sys.exit(1)
+
     if not focuser.move_absolute_position(pos):
         logging.error("Focuser error!!")
         sys.exit(1)
 
     sdi.wait_on_focuser_move(focuser)
 
+def measure_at_focus_pos(fpos, focus_expos):
+    if not args.simul:
+        if focuser.get_absolute_position() != fpos:
+            logging.info(f'Moving focuser to {fpos}')
+            move_focuser(focuser, fpos)
+            time.sleep(args.focusdelay)
+
+    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos}.fit')
+    if not args.simul:
+        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+    else:
+        tmp_starimage_data = simul_star.get_simul_star_image(fpos)
+        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+        rc = measure_frame(tmp_starimage_data)
+
+    return rc
+
+def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
+    if not args.simul:
+        if focuser.get_absolute_position() != fpos:
+            logging.info(f'Moving focuser to {fpos}')
+            move_focuser(focuser, fpos)
+            time.sleep(args.focusdelay)
+
+    avg_hfd = 0
+    ncap = 0
+    for i in range(0, niter):
+        imgname = os.path.join(imagesdir, f'vcurve_focuspos_{tag}{i:02d}_{fpos}.fit')
+        if not args.simul:
+            hfd = take_exposure_and_measure_star(cam, imgname, focus_expos)
+        else:
+            tmp_starimage_data = simul_star.get_simul_star_image(fpos)
+            pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+            hfd= measure_frame(tmp_starimage_data)
+
+        if hfd is None:
+            logging.error('No star found - continuing!')
+            continue
+
+        ncap += 1
+        avg_hfd += hfd
+
+        if args.debugplots:
+            fig.suptitle(f'{tag} pos iter #{i+1} focus {fpos} ' \
+                         f'HFD {hfd:5.2f} AVG:{avg_hfd/(ncap):5.2f}')
+            fig.show()
+            plt.pause(args.debugplotsdelay)
+
+    if ncap > 0:
+        return avg_hfd/ncap
+    else:
+        return None
+
 def parse_commandline():
     parser = argparse.ArgumentParser()
     parser.add_argument('focus_min', type=int, help='Lowest focus travel allowed')
     parser.add_argument('focus_max', type=int, help='Highest focus travel allowed')
     parser.add_argument('focus_dir', type=str, help='IN or OUT')
-    #parser.add_argument('nruns', type=int, help='Number of vcurve runs')
+    parser.add_argument('--focus_start', type=int, help='Starting focus pos')
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
     parser.add_argument('--debugplotsdelay', type=float, default=1, help='Delay (seconds) showing each plot')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
@@ -117,6 +176,8 @@ def parse_commandline():
     parser.add_argument('--saturation', default=55000, type=int,  help='Saturation level for sensor')
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     parser.add_argument('--winsize', default=250, type=int,  help='Size of window used to analyze star')
+    parser.add_argument('--focusdelay', default=0.5, type=float,  help='Delay (seconds) after focus moves')
+    parser.add_argument('--numaverage', default=5, type=int,  help='Number of images to average')
 
     return parser.parse_args()
 
@@ -178,6 +239,7 @@ if __name__ == '__main__':
         ax_2d = fig.add_subplot(122)
 
     focus_expos = args.exposure_start
+    logging.info(f'Starting exposure is {focus_expos} seconds')
 
     # vcurve parameters
 #    vcurve_rs = 0.04462570065893874
@@ -191,131 +253,95 @@ if __name__ == '__main__':
     vcurve_ls = -0.045806498798410436
     vcurve_lp = -5.22113594480723
 
-    if not args.simul:
-        fpos_1 = focuser.get_absolute_position()
+    if args.focus_start is None:
+        if not args.simul:
+            fpos_1 = focuser.get_absolute_position()
+        else:
+            fpos_1 = 8000
     else:
-        fpos_1 = 8000
+        fpos_1 = args.focus_start
 
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_1}.fit')
-    if not args.simul:
-        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
-    else:
-        fpos_1 = 8000
-        tmp_starimage_data = simul_star.get_simul_star_image(fpos_1)
-        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-        rc = measure_frame(tmp_starimage_data)
-
-    if rc is None:
-        logging.error('No star found!')
-        if args.debugplots:
-            plt.show()
-        sys.exit(1)
-
-    scen, sl, sr, hfl, hfr, totflux = rc
-    hfd_1 = hfr-hfl
-
-    if args.debugplots:
-        fig.suptitle(f'First focus {fpos_1} HFD {hfd_1:5.2f}')
-        fig.show()
-        plt.pause(args.debugplotsdelay)
-
-    # kind of redundant to take it again?
-    # take two measurements and see if one the right side of curve
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_1}.fit')
-    if not args.simul:
-        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
-    else:
-        fpos_1 = 8000
-        tmp_starimage_data = simul_star.get_simul_star_image(fpos_1)
-        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-        rc = measure_frame(tmp_starimage_data)
-
-    if rc is None:
-        logging.error('No star found!')
-        if args.debugplots:
-            plt.show()
-        sys.exit(1)
-
-    scen, sl, sr, hfl, hfr, totflux = rc
-    hfd_1 = hfr-hfl
-    logging.info(f'INITIAL FOCUS = {fpos_1}  HFD = {hfd_1}')
-
-    # move out 10 HFD
-    nsteps = int(10/vcurve_rs)
-    fpos_2 = fpos_1 + nsteps
-    logging.info(f'Moving out to {fpos_2}')
-
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_2}.fit')
-    if not args.simul:
-        move_focuser(focuser, fpos_2)
-
-        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
-    else:
-        tmp_starimage_data = simul_star.get_simul_star_image(fpos_2)
-        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-        rc = measure_frame(tmp_starimage_data)
-
-    if rc is None:
-        logging.error('No star found!')
-        if args.debugplots:
-            plt.show()
-        sys.exit(1)
-
-    scen, sl, sr, hfl, hfr, totflux = rc
-    hfd_2 = hfr-hfl
-    logging.info(f'SECOND FOCUS = {fpos_2}  HFD = {hfd_2}')
-
-    if args.debugplots:
-        fig.suptitle(f'Second focus {fpos_2} HFD {hfd_2:5.2f}')
-        fig.show()
-        plt.pause(args.debugplotsdelay)
-
-    # make sure hfd got larger
-    if hfd_2 < hfd_1:
-        logging.error('On wrong side of focus!')
-        sys.exit(1)
-
-    # compute location for desired initial HFD
-    initial_hfd = 24
-    fpos_initial = fpos_2 + int((initial_hfd-hfd_2)/vcurve_rs)
-    logging.info(f'Initial HFD = {initial_hfd} pred focus = {fpos_initial}')
-
-    # figure out direction
-    backlash = 200
     if args.focus_dir == 'OUT':
-        # start past desired start and move to it to remove backlash
-        fpos_pre_initial = fpos_initial - backlash
+        fdir = 1
+        vslope = vcurve_ls
+        vpid = vcurve_lp
     elif args.focus_dir == 'IN':
-        # start past desired start and move to it to remove backlash
-        fpos_pre_initial = fpos_initial + backlash
+        fdir = -1
+        vslope = vcurve_rs
+        vpid = vcurve_rp
     else:
         logging.error(f'Unknown focus directin {args.focus_dir} - exitting!')
         sys.exit(1)
 
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_initial}.fit')
-    if not args.simul:
-        logging.info(f'Moving to pre spot {fpos_pre_initial}')
-        move_focuser(focuser, fpos_pre_initial)
+    ntries = 0
+    right_side = False
+    while ntries < 3:
+        hfd_1 = measure_at_focus_pos(fpos_1, focus_expos)
 
-        # move out to initial HFD
-        logging.info(f'Moving to {fpos_initial}')
-        time.sleep(0.5)
-        move_focuser(focuser, fpos_initial)
+        if hfd_1 is None:
+            logging.error('No star found!')
+            if args.debugplots:
+                plt.show()
+            sys.exit(1)
 
-        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
-    else:
-        tmp_starimage_data = simul_star.get_simul_star_image(fpos_initial)
-        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-        rc = measure_frame(tmp_starimage_data)
+        if args.debugplots:
+            fig.suptitle(f'First focus {fpos_1} HFD {hfd_1:5.2f}')
+            fig.show()
+            plt.pause(args.debugplotsdelay)
 
-    if rc is None:
+        logging.info(f'INITIAL FOCUS = {fpos_1}  HFD = {hfd_1}')
+
+        # move out 10 HFD
+        nsteps = int(abs(10/vslope))
+        fpos_2 = fpos_1 - fdir*nsteps
+
+        hfd_2 = measure_at_focus_pos(fpos_2, focus_expos)
+
+        if hfd_2 is None:
+            logging.error('No star found!')
+            if args.debugplots:
+                plt.show()
+            sys.exit(1)
+
+        logging.info(f'SECOND FOCUS = {fpos_2}  HFD = {hfd_2}')
+
+        if args.debugplots:
+            fig.suptitle(f'Second focus {fpos_2} HFD {hfd_2:5.2f}')
+            fig.show()
+            plt.pause(args.debugplotsdelay)
+
+        # make sure hfd got larger
+        if hfd_2 < hfd_1:
+            logging.error('On wrong side of focus!')
+
+            #  bump to near zero point
+            fpos_1 = fpos_2 - fdir*int(abs(hfd_2/vslope))
+            ntries += 1
+            continue
+
+        right_side = True
+        break
+
+    if not right_side:
+        logging.error('Could not find right side for focusing')
+        sys.exit(1)
+
+    # compute location for desired initial HFD
+    initial_hfd = 24
+    fpos_initial = fpos_2 - fdir*int(abs((initial_hfd-hfd_2)/vslope))
+    logging.info(f'Initial HFD = {initial_hfd} pred focus = {fpos_initial}')
+
+    # figure out direction
+    backlash = 200
+    fpos_pre_initial = fpos_initial - fdir*backlash
+
+    hfd_initial = measure_at_focus_pos(fpos_pre_initial, focus_expos)
+
+    if hfd_initial is None:
         logging.error('No star found!')
         if args.debugplots:
             plt.show()
         sys.exit(1)
-
-    scen, sl, sr, hfl, hfr, totflux = rc
-    hfd_initial = hfr-hfl
 
     logging.info(f'INITIAL POSITION FOCUS = {fpos_initial}  HFD = {hfd_initial}')
 
@@ -325,63 +351,23 @@ if __name__ == '__main__':
         plt.pause(args.debugplotsdelay)
 
     # now take several measurements and get average HFD
-    avg_initial_hfd = 0
-    ninitial = 5
-    for i in range(0, ninitial):
-        imgname = os.path.join(imagesdir, f'vcurve_focuspos_initial{i:02d}_{fpos_initial}.fit')
-        if not args.simul:
-            rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
-        else:
-            tmp_starimage_data = simul_star.get_simul_star_image(fpos_initial)
-            pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-            rc = measure_frame(tmp_starimage_data)
-
-        if rc is None:
-            logging.error('No star found!')
-            if args.debugplots:
-                plt.show()
-            sys.exit(1)
-
-        scen, sl, sr, hfl, hfr, totflux = rc
-        avg_initial_hfd += hfr-hfl
-
-        if args.debugplots:
-            fig.suptitle(f'Initial pos iter #{i+1} focus {fpos_initial} ' \
-                         f'HFD {hfr-hfl:5.2f} AVG:{avg_initial_hfd/(i+1):5.2f}')
-            fig.show()
-            plt.pause(args.debugplotsdelay)
-
-    avg_initial_hfd /= ninitial
+    avg_initial_hfd = average_measure_at_focus_pos(fpos_initial, focus_expos, args.numaverage, tag='initial')
 
     logging.info(f'INITIAL POSITION FOCUS AVERAGE HFD = {avg_initial_hfd}')
 
     # now based on average at initial compute inner HFD location
     # compute location for desired initial HFD
     inner_hfd = 12
-    fpos_inner = fpos_2 + int((inner_hfd-hfd_2)/vcurve_rs)
+    fpos_inner = fpos_2 + fdir*int(abs((inner_hfd-hfd_2)/vslope))
     logging.info(f'Inner HFD = {inner_hfd} pred focus = {fpos_inner}')
 
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_inner}.fit')
-    if not args.simul:
-        # move out to inner HFD
-        logging.info(f'Moving to {fpos_inner}')
-        time.sleep(0.5)
-        move_focuser(focuser, fpos_inner)
+    hfd_inner = measure_at_focus_pos(fpos_inner, focus_expos)
 
-        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
-    else:
-        tmp_starimage_data = simul_star.get_simul_star_image(fpos_inner)
-        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-        rc = measure_frame(tmp_starimage_data)
-
-    if rc is None:
+    if hfd_inner is None:
         logging.error('No star found!')
         if args.debugplots:
             plt.show()
         sys.exit(1)
-
-    scen, sl, sr, hfl, hfr, totflux = rc
-    hfd_inner = hfr-hfl
 
     logging.info(f'INNER POSITION FOCUS = {fpos_inner}  HFD = {hfd_inner}')
 
@@ -391,67 +377,31 @@ if __name__ == '__main__':
         plt.pause(args.debugplotsdelay)
 
     # now take several measurements and get average HFD
-    avg_inner_hfd = 0
-    ninner = 5
-    for i in range(0, ninitial):
-        imgname = os.path.join(imagesdir, f'vcurve_focuspos_inner{i:02d}_{fpos_initial}.fit')
-        if not args.simul:
-            rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
-        else:
-            tmp_starimage_data = simul_star.get_simul_star_image(fpos_inner)
-            pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-            rc = measure_frame(tmp_starimage_data)
+    avg_inner_hfd = average_measure_at_focus_pos(fpos_inner, focus_expos, args.numaverage, tag='inner')
 
-        if rc is None:
+    logging.info(f'INNER POSITION FOCUS AVERAGE HFD = {avg_inner_hfd}')
+
+    # now compute best focus
+    fpos_best = int(fpos_inner + fdir*int(abs(avg_inner_hfd/vslope)) + vpid)
+
+    logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_inner} {int(avg_inner_hfd/vslope)} {vpid}')
+
+    if fpos_best > args.focus_max or fpos_best < args.focus_min:
+        logging.error(f'Best focus position {fpos_best} is outside allowed range {args.focus_min} to {args.focus_max}')
+    else:
+        best_hfd = measure_at_focus_pos(fpos_best, focus_expos)
+
+        if best_hfd is None:
             logging.error('No star found!')
             if args.debugplots:
                 plt.show()
             sys.exit(1)
 
-        scen, sl, sr, hfl, hfr, totflux = rc
-        avg_inner_hfd += hfr-hfl
+        logging.info(f'BEST FOCUS POSITION = {fpos_best} HFD = {best_hfd}')
 
         if args.debugplots:
-            fig.suptitle(f'Inner pos iter #{i+1} focus {fpos_inner} ' \
-                         f'HFD {hfr-hfl:5.2f} AVG:{avg_inner_hfd/(i+1):5.2f}')
-            fig.show()
-            plt.pause(args.debugplotsdelay)
+            fig.suptitle(f'Best pos focus {fpos_best} HFD {best_hfd:5.2f}')
 
-    avg_inner_hfd /= ninitial
-
-    logging.info(f'INNER POSITION FOCUS AVERAGE HFD = {avg_inner_hfd}')
-
-    # now compute best focus
-    fpos_best = int(fpos_inner - int(avg_inner_hfd/vcurve_rs) + vcurve_rp)
-
-    logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_inner} {int(avg_inner_hfd/vcurve_rs)} {vcurve_rp}')
-
-    if fpos_best > args.focus_max or fpos_best > args.focus_min:
-        logging.error(f'Best focus position {fpos_best} is outside allowed range {args.focus_min} to {args.focus_max}')
-
-    if not args.simul:
-        logging.info(f'Moving to {fpos_best}')
-        move_focuser(focuser, fpos_best)
-        imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos_best}.fit')
-
-        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
-    else:
-        tmp_starimage_data = simul_star.get_simul_star_image(fpos_best)
-        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-        rc = measure_frame(tmp_starimage_data)
-
-    if rc is None:
-        logging.error('No star found!')
-        if args.debugplots:
-            plt.show()
-        sys.exit(1)
-
-    scen, sl, sr, hfl, hfr, totflux = rc
-    best_hfd = hfr-hfl
-
-    logging.info(f'BEST FOCUS POSITION = {fpos_best} HFD = {best_hfd}')
-
+    # keep plots up until keypress
     if args.debugplots:
-        fig.suptitle(f'Best pos focus {fpos_best} HFD {best_hfd:5.2f}')
-        fig.show()
         plt.show()
