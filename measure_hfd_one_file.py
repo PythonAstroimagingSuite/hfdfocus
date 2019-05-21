@@ -16,7 +16,7 @@ from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 if __name__ == '__main__':
     logging.basicConfig(filename='measure_hfd_one_file.log',
                         filemode='w',
-                        level=logging.INFO,
+                        level=logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -38,6 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--starmodel', action='store_true',  help='Compute full star model')
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     parser.add_argument('--saturation', default=55000, type=int,  help='Saturation level for sensor')
+    parser.add_argument('--bgthres', default=50, type=int,  help='Threshold multiplier for star detection')
     args = parser.parse_args()
 
     logging.info(f'args = {args}')
@@ -49,7 +50,7 @@ if __name__ == '__main__':
 
     # analyze frame
     bg = 800
-    thres = 10000
+    #thres = 10000
 
     hdu = pyfits.open(args.image)
     starimage_data = hdu[0].data.astype(float)
@@ -69,17 +70,21 @@ if __name__ == '__main__':
 
 
     xcen, ycen, bg, mad, starmask = find_star(starimage_data, bgmodel=args.bgmodel,
-                                    starmodel=args.starmodel,
+                                    starmodel=args.starmodel, bgfact=args.bgthres,
                                     debugfits=True)
+
+    thres = bg + args.bgthres*mad
+    logging.info(f'Using thres = {thres}')
 
     if np.max(starimage_data[starmask] > args.saturation):
         logging.warning(f'SATURATED PIXELS DETECTED!')
 
     win = 300
-    xlow = int(xcen-win/2)
-    xhi = int(xcen+win/2)
-    ylow = int(ycen-win/2)
-    yhi = int(ycen+win/2)
+    xlow = max(0, int(xcen-win/2))
+    xhi = min(starimage_data.shape[0]-1, int(xcen+win/2))
+    ylow = max(0, int(ycen-win/2))
+    yhi = min(starimage_data.shape[1]-1, int(ycen+win/2))
+    logging.debug(f'cropping to window={win} x={xlow}:{xhi} y={ylow}:{yhi}')
     crop_data = starimage_data[ylow:yhi, xlow:xhi]
 
     if not args.noplot:

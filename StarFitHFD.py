@@ -195,7 +195,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
         pyfits.writeto(f'star_boxes.fits', star_boxes.astype(float), overwrite=True)
 
     cy, cx = ndimage.measurements.center_of_mass(star_boxes)
-    logging.debug(f'COM cx, cy = {cx}, {cy}')
+    logging.debug(f'COM cx, cy = {cx}, {cy} box={max_l}')
 
     # compute background near star
     #

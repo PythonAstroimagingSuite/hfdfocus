@@ -40,10 +40,11 @@ def measure_frame(starimage_data):
         logging.warning(f'SATURATED PIXELS DETECTED!')
 
     win = args.winsize
-    xlow = int(xcen-win/2)
-    xhi = int(xcen+win/2)
-    ylow = int(ycen-win/2)
-    yhi = int(ycen+win/2)
+    xlow = max(0, int(xcen-win/2))
+    xhi = min(starimage_data.shape[0]-1, int(xcen+win/2))
+    ylow = max(0, int(ycen-win/2))
+    yhi = min(starimage_data.shape[1]-1, int(ycen+win/2))
+    logging.debug(f'cropping to window={win} x={xlow}:{xhi} y={ylow}:{yhi}')
     crop_data = starimage_data[ylow:yhi, xlow:xhi]
 
     if args.debugplots:

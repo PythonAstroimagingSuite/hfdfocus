@@ -46,13 +46,14 @@ def parse_commandline():
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     parser.add_argument('--runoffset', default=0, type=int,  help='Shift center of run by this amount')
     parser.add_argument('--hfdcutoff', default=10, type=float,  help='Ignore points with HFD less than this value')
+    parser.add_argument('--bgthres', default=50, type=int,  help='Threshold multiplier for star detection')
 
     return parser.parse_args()
 
 if __name__ == '__main__':
     logging.basicConfig(filename='sample_vcurve.log',
                         filemode='w',
-                        level=logging.INFO,
+                        level=logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -138,7 +139,7 @@ if __name__ == '__main__':
             focus_end = focus_low
             focus_nstep = args.focus_nstep
         else:
-            logging.error(f'Unknown focus directin {args.focus_dir} - exitting!')
+            logging.error(f'Unknown focus direction {args.focus_dir} - exitting!')
             sys.exit(1)
 
         # move to init pos
@@ -209,9 +210,11 @@ if __name__ == '__main__':
                 #bg = 800
                 #thres = 10000
 
-                xcen, ycen, bg, mad, starmask = find_star(starimage_data, debugfits=True)
+                xcen, ycen, bg, mad, starmask = find_star(starimage_data,
+                                                          bgfact=args.bgthres,
+                                                          debugfits=True)
 
-                thres = bg + 15*mad
+                thres = bg + args.bgthres*mad
 
                 logging.info(f'Using thres = {thres}')
 
@@ -219,10 +222,11 @@ if __name__ == '__main__':
                     logging.warning(f'SATURATED PIXELS DETECTED!')
 
                 win = 300
-                xlow = int(xcen-win/2)
-                xhi = int(xcen+win/2)
-                ylow = int(ycen-win/2)
-                yhi = int(ycen+win/2)
+                xlow = max(0, int(xcen-win/2))
+                xhi = min(starimage_data.shape[0]-1, int(xcen+win/2))
+                ylow = max(0, int(ycen-win/2))
+                yhi = min(starimage_data.shape[1]-1, int(ycen+win/2))
+                logging.debug(f'cropping to window={win} x={xlow}:{xhi} y={ylow}:{yhi}')
                 crop_data = starimage_data[ylow:yhi, xlow:xhi]
 
                 if args.debugplots:
