@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import json
 import argparse
 import logging
 
@@ -105,14 +106,15 @@ if __name__ == '__main__':
     focus_center = args.focus_center
     focus_range = args.focus_range
     for iter in range(0, args.nruns):
-        if iter != 0:
-            fig2.clear()
-            ax_hfd = fig2.add_subplot(111)
-            hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
+        if args.debugplots:
+            if iter != 0:
+                fig2.clear()
+                ax_hfd = fig2.add_subplot(111)
+                hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
 
-            fig.clear()
-            ax_2d = fig.add_subplot(121)
-            ax_1d = fig.add_subplot(122)
+                fig.clear()
+                ax_2d = fig.add_subplot(121)
+                ax_1d = fig.add_subplot(122)
 
         # figure out direction
         backlash = 200
@@ -337,14 +339,16 @@ if __name__ == '__main__':
         logging.info(f'   yzero: {siegel_right_zero}')
         logging.info(f'   PID  : {siegel_best_pos - siegel_right_zero}')
 
-        f = open(os.path.join(imagesdir, 'vcurve_fits.txt'), 'a')
+        f = open(os.path.join(imagesdir, 'vcurve_fits.json'), 'a')
         ls = siegel_left_fit[0]
         lp = siegel_best_pos - siegel_left_zero
         rs = siegel_right_fit[0]
         rp = siegel_best_pos - siegel_right_zero
-        f.write(f'{ls}, {lp}, {rs}, {rp}\n')
+        tstamp = time.strftime('%Y/%m/%d %H:%M:%S %Z')
+        #f.write(f'{tstamp}, {ls}, {lp}, {rs}, {rp}\n')
+        j = json.dumps({ 'timestamp' : tstamp, 'rightslope' : rs, 'rightpid' : rp, 'leftslope' : ls, 'leftpid' : lp})
+        f.write(j + '\n')
         f.close()
-
 
     if args.debugplots:
         plt.show()
