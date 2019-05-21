@@ -238,7 +238,7 @@ def find_star_limits_robust(profile, thres=0):
     left = None
     right = None
     idx = 0
-    while idx < len(profile):
+    while idx < len(profile)-2:
         #print('l', idx, profile[idx], profile[idx+1], thres)
         if profile[idx+1] >= thres and profile[idx] < thres:
             left = idx

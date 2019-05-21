@@ -38,7 +38,7 @@ def measure_frame(starimage_data):
 
     xcen, ycen, bg, mad = find_star(starimage_data, debugfits=True)
 
-    win = 100
+    win = args.winsize
     xlow = int(xcen-win/2)
     xhi = int(xcen+win/2)
     ylow = int(ycen-win/2)
@@ -64,8 +64,23 @@ def take_exposure_and_measure_star(cam, imgname, focus_expos):
     global args, fig, fig2, ax_1d, ax_2d, ax_hfd, ax_hfd
 
     if not args.simul:
-        logging.info(f'Taking exposure exposure = {focus_expos} seconds')
-        rc = sdi.take_exposure(cam, focus_expos, imgname)
+        if args.framesize != 0:
+            w, h = cam.get_size()
+            xl = int(w/2-args.framesize/2)
+            xw = args.framesize
+            yt = int(h/2-args.framesize/2)
+            yh = args.framesize
+            roi = (xl, yt, xw, yh)
+        else:
+            roi = None
+
+        logging.info(f'Taking exposure exposure = {focus_expos} seconds roi = {roi}')
+
+        rc = sdi.take_exposure(cam, focus_expos, imgname, roi=roi)
+
+#        logging.info(f'Taking exposure exposure = {focus_expos} seconds')
+#        rc = sdi.take_exposure(cam, focus_expos, imgname)
+
         logging.info(f'exposure result code = {rc}')
 
     hdu = pyfits.open(imgname)
@@ -96,6 +111,8 @@ def parse_commandline():
     parser.add_argument('--exposure_min', default=1, type=int,  help='Minimum exposure value')
     parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
+    parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
+    parser.add_argument('--winsize', default=250, type=int,  help='Size of window used to analyze star')
 
     return parser.parse_args()
 
@@ -164,10 +181,11 @@ if __name__ == '__main__':
 #    vcurve_ls =-0.04565294355776672
 #    vcurve_lp =-4.848226361604247
 
-    vcurve_rs = 0.049684986658347155
-    vcurve_rp = -6.715524350563101
-    vcurve_ls = -0.05181792218702318
-    vcurve_lp = 6.4390991317122825
+
+    vcurve_rs = 0.04472660490995652
+    vcurve_rp = 5.333072819832182
+    vcurve_ls = -0.045806498798410436
+    vcurve_lp = -5.22113594480723
 
     if not args.simul:
         fpos_1 = focuser.get_absolute_position()

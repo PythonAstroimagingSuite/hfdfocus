@@ -43,6 +43,7 @@ def parse_commandline():
     parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
+    parser.add_argument('--runoffset', default=0, type=int,  help='Shift center of run by this amount')
 
     return parser.parse_args()
 
@@ -118,7 +119,8 @@ if __name__ == '__main__':
 
         # figure out direction
         backlash = 200
-        focus_low = int(focus_center-focus_range/2)
+        logging.info(f'Shifting focus center by runoffset = {args.runoffset}')
+        focus_low = int(focus_center+args.runoffset-focus_range/2)
         focus_high = focus_low + args.focus_range
         if args.focus_dir == 'OUT':
             # start past desired start and move to it to remove backlash
@@ -255,6 +257,8 @@ if __name__ == '__main__':
                 hfd_plot.set_data(fpos_arr, hfd_arr)
                 ax_hfd.relim()
                 ax_hfd.autoscale_view()
+                ax_hfd.set_title(f'iter {iter+1} of {args.nruns} pt {len(hfd_arr)+1} of {args.focus_nstep}')
+
                 fig2.canvas.draw()
 
                 ax_1d.axvline(scen, color='red')
