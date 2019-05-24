@@ -76,6 +76,8 @@ class SAOCatalog:
                 continue
 
             nread += 1
+            if nread % 1000 == 0:
+                logging.info(f'{nread} read')
 #            if nread > 100:
 #                break
 

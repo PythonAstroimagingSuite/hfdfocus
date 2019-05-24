@@ -1,5 +1,5 @@
-
-
+#!/usr/bin/env python3
+import os
 import sys
 import time
 import numpy as np
@@ -27,15 +27,18 @@ if __name__ == '__main__':
     log.addHandler(ch)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('cat', type=str, help='Catalog to search')
-#    parser.add_argument('ra2000', type=str, help='RA J2000')
-#    parser.add_argument('dec2000', type=str, help='DEC J2000')
-#    parser.add_argument('dist', type=float, help='Max distance in degrees')
-#    parser.add_argument('--minmag', type=float, default=8)
-#    parser.add_argument('--maxmag', type=float, default=7)
+    parser.add_argument('cat', type=str, help='Catalog to process')
+    parser.add_argument('--excluderad', type=float, default=0.15,
+                        help='Exclusion radius in degrees')
     args = parser.parse_args()
 
     logging.info(f'args = {args}')
+
+    # see if exclusion list already exists so we don't overwrite
+    if os.path.isfile('sao_exclude_lst.dat'):
+        logging.error(f'The file sao_exclude_lst.dat already exists!')
+        logging.error('Move it out of the way before running this command or')
+        sys.exit(1)
 
     saocat = load_SAOCatalog_binary(args.cat)
     logging.info(f'Loaded {len(saocat.id)} stars')
@@ -47,12 +50,12 @@ if __name__ == '__main__':
     ndone = 0
     for cat_idx in range(0, len(saocat.id)):
         logging.debug(f'Evaluating cat index={cat_idx} ' \
-                      f'SAO={saocat.id[cat_idx]:10s}')
+                      f'SAO={saocat.id[cat_idx]:>8d}')
         #logging.info("CatIdx    SAO           RA.DEC (J2000)           VMag")
 
         radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx],
                          unit=u.deg, frame='fk5', equinox='J2000')
-        logging.info(f"{cat_idx}   {saocat.id[cat_idx]:10s} " \
+        logging.info(f"{cat_idx}   {saocat.id[cat_idx]:>8d} " \
                      f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
                      f"{saocat.vmag[cat_idx]:4.2f}")
 
@@ -75,7 +78,7 @@ if __name__ == '__main__':
 
     te = time.time()
     logging.info(f'Excluded {len(exclude_list)} stars in {te-ts:6.2f} seconds')
-    f=open('sao_exclude_lst.txt', 'w')
+    f=open('sao_exclude_lst.dat', 'w')
     for exclude_idx in exclude_list:
         f.write(f'{exclude_idx}, {saocat.id[exclude_idx]}\n')
     f.close()

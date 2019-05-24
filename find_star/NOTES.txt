@@ -50,6 +50,25 @@ This program goes through the SAO Catalog and flags any stars with another
 star within 0.15 degrees.  The list of catalog index numbers and SAO numbers
 are written to the file 'sao_exclude_lst.txt'.
 
+Creating SAO Catalog:
 
+First create the catalog SAT_Catalog_m5_p11.bin
 
+  python saocatalog_create.py SAO_Catalog_m5_p11.bin --maxmag " -5" --minmag 11
 
+Now generate an exclusion list of all stars within 0.15 degrees:
+
+  python saocatalog_exclude_stars.py SAO_Catalog_m5_p11.bin --exclusionrad 0.15
+
+This creates the file 'sao_exclude_lst.dat'
+
+Rename this to something else like 'SAO_Catalog_Exclusion_List_0p15deg'
+
+Now create a version of the binary catalog with these stars remove:
+
+   python saocatalog_filter_excluded_stars.py SAO_Catalog_m5_p11.bin \
+        SAO_Catalog_m5_p11_filtered.bin SAO_Catalog_Exclusion_List_0p15deg.txt
+
+This creates 'SAO_Catalog_m5_p11_filtered.bin' that has the problematic
+stars removed and can be using with the find_nearby_stars.py script.  Since
+these stars are now not in the catalog the find stars script will run faster.
