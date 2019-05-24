@@ -23,9 +23,11 @@ import time
 import logging
 import argparse
 import numpy as np
-from scipy import signal, ndimage
+from scipy import ndimage
 from scipy.interpolate import interp1d
 from scipy.integrate import romb
+
+#import skimage.measure as skmeasure
 
 import astropy.io.fits as pyfits
 
@@ -61,6 +63,44 @@ def compute_noise_level(data):
 
 def compute_median(data):
     return np.median(data)
+
+# from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/
+def raw_moment(data, i_order, j_order):
+    nrows, ncols = data.shape
+    y_indices, x_indicies = np.mgrid[:nrows, :ncols]
+    return (data * x_indicies**i_order * y_indices**j_order).sum()
+
+def moments_cov(data):
+    data_sum = data.sum()
+    m10 = raw_moment(data, 1, 0)
+    m01 = raw_moment(data, 0, 1)
+    x_centroid = m10 / data_sum
+    y_centroid = m01 / data_sum
+    u11 = (raw_moment(data, 1, 1) - x_centroid * m01) / data_sum
+    u20 = (raw_moment(data, 2, 0) - x_centroid * m10) / data_sum
+    u02 = (raw_moment(data, 0, 2) - y_centroid * m01) / data_sum
+    cov = np.array([[u20, u11], [u11, u02]])
+    return cov
+
+def get_major_minor_axes(data):
+    cov = moments_cov(data)
+    evals, evecs = np.linalg.eig(cov)
+
+    sort_indices = np.argsort(evals)[::-1]
+    x_v1, y_v1 = evecs[:, sort_indices[0]]  # Eigenvector with largest eigenvalue
+    x_v2, y_v2 = evecs[:, sort_indices[1]]
+
+    n_v1 = evals[sort_indices][0]
+    n_v2 = evals[sort_indices][1]
+#    print(evals)
+#    print(evals[sort_indices])
+    logging.debug(f'Major axis = {x_v1}, {y_v1}, {n_v1}')
+    logging.debug(f'Minor axis = {x_v2}, {y_v2}, {n_v2}')
+
+    return ((x_v1, y_v1, n_v1), (x_v2, y_v2, n_v2))
+
+
+# end of moment code
 
 def find_centroid(image_data, thres):
 
@@ -189,13 +229,59 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
         logging.error('find_star(): no object found')
         return None
 
+    # see if another object is within window centered on main object
+    npix_max_l = (max_l[0].stop-max_l[0].start)*(max_l[1].stop-max_l[1].start)
+    alone = True
+    logging.debug('looking for nearby stars')
+    for l in ndimage.find_objects(star_label):
+        npix = (l[0].stop-l[0].start)*(l[1].stop-l[1].start)
+        logging.debug(f'{max_l}, {l}, {npix_max_l}, {npix}')
+        if l[0].start == max_l[0].start and l[1].start == max_l[1].start and \
+           l[0].stop == max_l[0].stop and l[1].stop == max_l[1].stop:
+               logging.debug('skipping is original label')
+               continue
+
+        if npix > max_pix/2:
+            alone = False
+            break
+
+    if not alone:
+        logging.warning('ERROR: find_star() Another star is nearby!')
+
     star_boxes[max_l] = 1
 
     if debugfits:
         pyfits.writeto(f'star_boxes.fits', star_boxes.astype(float), overwrite=True)
 
+#    import skimage.morphology as skmorph
+#    pw = max_l[1].stop - max_l[1].start
+#    ph = max_l[0].stop - max_l[0].start
+#    logging.debug(f'{max_l} {pw} {ph}')
+#
+#    perim_image = skmorph.flood_fill(dilate_star_model[max_l],
+#                                     seed_point=(int(pw/2), int(ph/2)),
+#                                     new_value=True)
+#    perim_image = skmorph.convex_hull_image(dilate_star_model[max_l])
+#
+#    perim = skmeasure.perimeter(perim_image)
+#    if debugfits:
+#        pyfits.writeto(f'perim_image.fits', perim_image.astype(float), overwrite=True)
+#
+    axes = get_major_minor_axes(dilate_star_model[max_l])
+    majax = axes[0][2]
+    minax = axes[1][2]
+    ecc = math.sqrt(1.0-(minax/majax))
+    logging.debug(f'Major/Minor/Ecc = {majax} {minax} {ecc}')
+
+    if abs(0.5-ecc) > 0.1:
+        logging.warning('fERROR find_star(): Eccentricity {ecc} is outside acceptable range - probably not alone')
+        alone = False
+
+
     cy, cx = ndimage.measurements.center_of_mass(star_boxes)
-    logging.debug(f'COM cx, cy = {cx}, {cy} box={max_l}')
+    logging.debug(f'COM cx, cy = {cx}, {cy}')
+#    logging.debug(f'box={max_l}')
+#    logging.debug(f'boxperim = {2*pw+2*ph} predperim={np.pi*(pw+ph)/2} actperim = {perim}')
 
     # compute background near star
     #
@@ -214,7 +300,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
 
     logging.debug(f'find_star took {ttot_e-ttot_s} seconds')
 
-    return cx, cy, bglevel, bgmad, star_boxes
+    return cx, cy, bglevel, bgmad, star_boxes, alone
 
 
 # horizontal bin data to form a 1D star profile
@@ -407,7 +493,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r, totflux)
 
 def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
-    xcen, ycen, bg, noise, starmask = find_star(image_data, debugfits=debugfits)
+    xcen, ycen, bg, noise, starmask, alone = find_star(image_data, debugfits=debugfits)
 
     img_ht, img_wd = image_data.shape
 
@@ -433,8 +519,8 @@ def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, 
         ax_1d.plot(profile)
         plt.draw()
 
-    return find_hfd_from_1D(profile, thres=thres)
-
+    cidx, lx, rx, lr, rr, totflux = find_hfd_from_1D(profile, thres=thres)
+    return cidx, lx, rx, lr, rr, totflux, alone
 
 def test_1d_with_gaussian():
 

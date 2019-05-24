@@ -22,7 +22,8 @@ import logging
 import numpy as np
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
-from skimage.transform import resize as image_resize
+#import skimage.transform as tf
+import scipy.ndimage as ndimage
 from StarFitHFD import find_brightest_star_HFD
 
 def parse_commandline():
@@ -38,10 +39,12 @@ def parse_commandline():
 
 def shrink_star(starimage_data, bgimage_data, reduction):
     ht, wd = starimage_data.shape
-    shrunk_star_data = image_resize(starimage_data,
-                                    [int(ht*reduction), int(wd*reduction)],
-                                    order=0, mode='constant', anti_aliasing=True)
-
+#    shrunk_star_data = tf.resize(starimage_data,
+#                                    [int(ht*reduction), int(wd*reduction)],
+#                                    order=0, mode='constant', anti_aliasing=True)
+    shrunk_star_data = ndimage.zoom(starimage_data,
+                                    [reduction, reduction],
+                                    order=0, mode='constant')#, anti_aliasing=True)
     # scale it up so flux is the same
     bgmed = np.median(bgimage_data)
     shrunk_star_data = (shrunk_star_data-bgmed)/reduction/reduction + bgmed
@@ -64,7 +67,8 @@ def shrink_star(starimage_data, bgimage_data, reduction):
 
 class C8_F7_Star_Simulator:
     def __init__(self, starimage_name='data/C8_Simul_Defocus_Star.fit',
-                 bgimage_name='data/C8_Simul_BG.fit'):
+                 bgimage_name='data/C8_Simul_BG.fit',
+                 companion_offset=None, companion_flux_ratio=1.0):
 
         # load background image
         #bgimage_name = 'data/C8_Simul_BG.fit'
@@ -82,6 +86,10 @@ class C8_F7_Star_Simulator:
         # create logging and other computations on creation
         self.ref_hfd = None
 
+        # simulate a nearby star
+        self.companion_offset = companion_offset
+        self.companion_flux_ratio = companion_flux_ratio
+
     # measured best focus position from sampled V curve
     def get_best_focus_pos(self):
         return 7983
@@ -91,7 +99,7 @@ class C8_F7_Star_Simulator:
         # load this on demand
         if self.ref_hfd is None:
             # measure star size
-            scen, sl, sr, hfl, hfr, totflux = find_brightest_star_HFD(self.starimage_data)
+            scen, sl, sr, hfl, hfr, totflux, alone = find_brightest_star_HFD(self.starimage_data)
             self.ref_hfd = hfr-hfl
             logging.info(f'Reference star HFD = {self.ref_hfd}')
 
@@ -114,6 +122,18 @@ class C8_F7_Star_Simulator:
         hfd = self.simul_hfd_size(focus_pos, focus_cen)
         red = min(1.0, hfd/self.ref_hfd)
         shrunk_image = shrink_star(self.starimage_data, self.bgimage_data, red)
+
+        # make another star offset
+        if self.companion_offset is not None:
+#            tform = tf.SimilarityTransform(scale=1, translation=self.companion_offset)
+#            comp_image = tf.warp(shrunk_image, tform, mode='constant',
+#                                 cval=np.median(shrunk_image))
+            # flip x/y offsets
+            ox, oy = self.companion_offset[1], self.companion_offset[0]
+            comp_image = ndimage.shift(shrunk_image, (ox, oy), mode='constant',
+                                 cval=np.median(shrunk_image))
+            shrunk_image = (shrunk_image+self.companion_flux_ratio*comp_image)/(1+self.companion_flux_ratio)
+
         return shrunk_image
 
 

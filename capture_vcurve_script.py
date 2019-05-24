@@ -88,7 +88,7 @@ if __name__ == '__main__':
         if not cam:
             logging.error(f'Unabled to connect to camera driver {args.camera_driver}')
     else:
-        simul_star = C8_F7_Star_Simulator()
+        simul_star = C8_F7_Star_Simulator(companion_offset=(20, 20), companion_flux_ratio=1.0)
 
     # create output dir
     datestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())
@@ -210,7 +210,7 @@ if __name__ == '__main__':
                 #bg = 800
                 #thres = 10000
 
-                xcen, ycen, bg, mad, starmask = find_star(starimage_data,
+                xcen, ycen, bg, mad, starmask, alone = find_star(starimage_data,
                                                           bgfact=args.bgthres,
                                                           debugfits=True)
 
@@ -226,7 +226,7 @@ if __name__ == '__main__':
                 xhi = min(starimage_data.shape[0]-1, int(xcen+win/2))
                 ylow = max(0, int(ycen-win/2))
                 yhi = min(starimage_data.shape[1]-1, int(ycen+win/2))
-                logging.debug(f'cropping to window={win} x={xlow}:{xhi} y={ylow}:{yhi}')
+                #logging.debug(f'cropping to window={win} x={xlow}:{xhi} y={ylow}:{yhi}')
                 crop_data = starimage_data[ylow:yhi, xlow:xhi]
 
                 if args.debugplots:
@@ -282,10 +282,11 @@ if __name__ == '__main__':
                     ax_1d.axvline(hfr, color='blue')
                     delta = sr-sl
                     ax_1d.set_xlim(sl-delta/4, sr+delta/4)
-                    ax_1d.set_title(f'{hfr-hfl:5.3f}')
-                print('drawing plot')
+                    ax_1d.set_title(f'{hfr-hfl:5.3f} {alone}')
+                #print('drawing plot')
                 fig.show()
-                plt.pause(0.01)
+                plt.pause(2)
+                #plt.show()
 
         # write out
         f = open(os.path.join(imagesdir, f'hfd_run_{iter+1:03d}.txt'), 'w')

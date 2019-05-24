@@ -1,24 +1,16 @@
 # find closest star within mag range
 # FIXME DOES NOT CONSIDER MERIDAN FLIP IMPLICATIONS!
 
-import os
 import sys
 import time
 import numpy as np
 import argparse
 import logging
 
-import astropy.io.fits as pyfits
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from astropy.coordinates import FK5
-from astropy.coordinates import Angle
 
-
-import matplotlib.pyplot as plt
-
-from SAOCatalog import SAOCatalog, load_SAOCatalog_binary
-
+from SAOCatalog import load_SAOCatalog_binary
 
 if __name__ == '__main__':
     logging.basicConfig(filename='find_star.log',
@@ -31,7 +23,7 @@ if __name__ == '__main__':
     log = logging.getLogger()
     formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
@@ -48,7 +40,6 @@ if __name__ == '__main__':
     logging.info(f'args = {args}')
 
     saocat = load_SAOCatalog_binary(args.cat)
-
     logging.info(f'Loaded {len(saocat.id)} stars')
 
     # 'fast' compute distance between points
@@ -58,55 +49,135 @@ if __name__ == '__main__':
     logging.info(f"target_str = {target_str}")
 
     try:
-        target = SkyCoord(target_str, unit=(u.hourangle, u.deg), frame='fk5', equinox='J2000')
+        target = SkyCoord(target_str, unit=(u.hourangle, u.deg),
+                          frame='fk5', equinox='J2000')
     except ValueError:
         logging.error("Invalid RA/DEC POSITION!")
         sys.exit(1)
 
     # SAO Catalog I have is in J2000 so we can compare directly
+    cand_idx, cand_dist = saocat.find_stars_near_target(target, args.dist,
+                                                        args.minmag, args.maxmag)
 
-    t_ra_rad = target.ra.radian
-    t_dec_rad = target.dec.radian
+    logging.debug(f'cand_idx = {cand_idx} cand_dist = {cand_dist}')
 
-    print(t_ra_rad, t_dec_rad)
+    if len(cand_idx) == 0:
+        logging.error('No stars found!')
+        sys.exit(1)
 
-    # convert sao coords to radians
-    c_ra_rad = np.deg2rad(saocat.ra)
-    c_dec_rad = np.deg2rad(saocat.dec)
+    logging.info('Candidates:')
+    logging.info(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
+    for i in range(0, len(cand_idx)):
+        cat_idx = cand_idx[i]
+        radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx], unit=u.deg,
+                         frame='fk5', equinox='J2000')
+        logging.info(f" {cat_idx}   {np.rad2deg(cand_dist[i]):5.2f} " \
+                     f"{saocat.id[cat_idx]:10s} " \
+                     f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
+                     f"{saocat.vmag[cat_idx]:4.2f}")
+    logging.info("")
 
-    # equation for distance between two points on sphere
-    # try with haversine
-    ddec = t_dec_rad - c_dec_rad
-    dra = t_ra_rad - c_ra_rad
-    a = (np.sin(ddec/2)**2 + np.cos(t_dec_rad)*np.cos(c_dec_rad)*np.sin(dra/2)**2)
-    c = 2 * np.arcsin(np.sqrt(a))
+    nnear = []
+    nnear_idx = []
+    nnear_dist = []
+    near_search_rad = 1
+    exclusion_rad = 0.15
+    for i in range(0, len(cand_idx)):
+        cat_idx = cand_idx[i]
+        logging.debug(f'Evaluating cat index={cat_idx} SAO={saocat.id[cat_idx]:10s}')
+        logging.info("CatIdx    Deg   SAO           RA.DEC (J2000)           VMag")
 
-    print(np.max(c), np.min(c), np.median(c))
+        radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx], unit=u.deg,
+                         frame='fk5', equinox='J2000')
+        logging.info(f"{cat_idx}  {np.rad2deg(cand_dist[i]):5.2f} " \
+                     f"{saocat.id[cat_idx]:10s} "\
+                     f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
+                     f"{saocat.vmag[cat_idx]:4.2f}")
 
-    #sortargs = np.argsort(c)
-    close_idx = np.where(c < np.deg2rad(args.dist))[0]
-    print(f'found {len(close_idx)} within {args.dist} degrees')
+        # look within 1 degree for other stars - set maxmag so all brighter star considered and minmag to 2 mags fainter
+        cand_idx_2, cand_dist_2 = saocat.find_stars_near_target(radec,
+                                                                near_search_rad,
+                                                                999, -999,
+                                                                exclude=[cat_idx])
+        logging.debug(f'cand_idx_2 = {cand_idx_2} cand_dist_2 = {cand_dist_2}')
 
-    # filter by mag
-    mags = np.array(saocat.vmag)[close_idx]
-    mags_idx = np.where((mags < args.minmag) & (mags >= args.maxmag))
+        logging.info('Nearby Candidates:')
+        logging.info(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
+        for i2 in range(0, len(cand_idx_2)):
+            cat_idx_2 = cand_idx_2[i2]
+            print(i2, cat_idx_2)
+            radec = SkyCoord(saocat.ra[cat_idx_2], saocat.dec[cat_idx_2], unit=u.deg, frame='fk5', equinox='J2000')
+            logging.info(f" {cat_idx_2}   {np.rad2deg(cand_dist_2[i2]):5.2f} " \
+                         f"{saocat.id[cat_idx_2]:10s} " \
+                         f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
+                         f"{saocat.vmag[cat_idx_2]:4.2f}")
 
-    print(f'found {len(mags_idx)} within {args.dist} degrees and {args.maxmag} < mag < {args.minmag}')
+        # figure out closest
+        closest_idx = np.argmin(cand_dist_2)
+        print(i, closest_idx, cand_idx_2[closest_idx], cand_dist_2[closest_idx])
+        closest_deg = np.rad2deg(np.min(cand_dist_2))
+        logging.info(f"      nstars={len(cand_idx_2)} closest={closest_deg} deg")
 
-#    print(close_idx)
-#    print(mags_idx)
+        if closest_deg > exclusion_rad:
+            nnear.append(len(cand_idx_2))
+            nnear_idx.append(cat_idx)
+            nnear_dist.append(cand_dist[i])
+        else:
+            logging.info(f'Excluding star due to neighbor within {exclusion_rad} degrees.')
 
-#    ids = []
-#    for i in close_idx[:20]:
-#        ids.append(int(saocat.id[i]))
-#
-##    for i in sorted(ids):
-##        print(i)
+        logging.info("")
 
-    for i in close_idx[mags_idx]:
-        radec = SkyCoord(saocat.ra[i], saocat.dec[i], unit=u.deg, frame='fk5', equinox='J2000')
-        logging.info(f"{i:5d} {np.rad2deg(c[i]):5.2f} {saocat.id[i]:10s} {radec.to_string('hmsdms', sep=':'):30s}  {saocat.vmag[i]:4.2f}")
-        logging.info(f"{i:5d} {np.rad2deg(c[i]):5.2f} {saocat.id[i]:10s} {c_ra_rad[i]:5.2f} {c_dec_rad[i]:5.2f}  {saocat.vmag[i]:4.2f}")
+    logging.debug(f'nnear={nnear} nnear_idx={nnear_idx} nnear_dist={nnear_dist}')
+
+
+    if len(nnear) < 1:
+        logging.error('No star found!')
+        sys.exit(1)
+
+    # find cand with least nearby
+    least_idx = np.argmin(nnear)
+    best_idx = nnear_idx[least_idx]
+    radec = SkyCoord(saocat.ra[best_idx], saocat.dec[best_idx],
+                     unit=u.deg, frame='fk5', equinox='J2000')
+    logging.info(f'BEST STAR = {best_idx} SAO{saocat.id[best_idx]:10s} ' \
+                 f'VMag = {saocat.vmag[best_idx]:4.2f} # nearby = {nnear[least_idx]}')
+    logging.info("CatIdx    Deg   SAO           RA.DEC (J2000)           VMag")
+    logging.info(f"{best_idx}  {np.rad2deg(nnear_dist[least_idx]):5.2f} " \
+                 f"{saocat.id[best_idx]:10s} " \
+                 f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
+                 f"{saocat.vmag[best_idx]:4.2f}")
+
+
+    #logging.info(f"{np.rad2deg(nnear_dist[least_idx]):5.2f} {saocat.id[best_idx]:10s} {radec.to_string('hmsdms', sep=':'):30s}  {saocat.vmag[best_idx]:4.2f}")
+
+    cand_idx_2, cand_dist_2 = saocat.find_stars_near_target(radec, 1, 999, -999, exclude=[best_idx])
+    logging.debug(f'cand_idx_2 = {cand_idx_2} cand_dist_2 = {cand_dist_2}')
+    logging.info(f'List of stars closest to BEST STAR')
+    logging.info(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
+    for i2 in range(0, len(cand_idx_2)):
+        cat_idx_2 = cand_idx_2[i2]
+        radec = SkyCoord(saocat.ra[cat_idx_2], saocat.dec[cat_idx_2],
+                         unit=u.deg, frame='fk5', equinox='J2000')
+        logging.info(f" {cat_idx_2}   {np.rad2deg(cand_dist_2[i2]):5.2f} " \
+                     f"{saocat.id[cat_idx_2]:10s} " \
+                     f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
+                     f"{saocat.vmag[cat_idx_2]:4.2f}")
+
+    distsort_idx = np.argsort(nnear)
+    logging.info("")
+    logging.info(f'Candidates within {args.dist} degrees of J2000 ' \
+                 f'{target.to_string("hmsdms", sep=":"):30s}')
+    logging.info('CatIdx    Deg     SAO           RA.DEC (J2000)            ' \
+                 'VMag     # near stars')
+    for i in range(0, len(distsort_idx)):
+        near_idx = distsort_idx[i]
+        cat_idx = nnear_idx[near_idx]
+        radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx],
+                         unit=u.deg, frame='fk5', equinox='J2000')
+        logging.info(f"{cat_idx}  {np.rad2deg(nnear_dist[near_idx]):5.2f} " \
+                     f"{saocat.id[cat_idx]:>8s}   " \
+                     f"{radec.to_string('hmsdms', sep=':', precision=3):30s} "\
+                     f"{saocat.vmag[cat_idx]:4.2f}        {nnear[near_idx]}")
 
 
 

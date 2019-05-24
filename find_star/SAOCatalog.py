@@ -1,10 +1,11 @@
 import logging
 import pickle
 
-from astropy import units as u
-from astropy.coordinates import SkyCoord
-from astropy.coordinates import FK5
-from astropy.coordinates import Angle
+import numpy as np
+#from astropy import units as u
+#from astropy.coordinates import SkyCoord
+#from astropy.coordinates import FK5
+#from astropy.coordinates import Angle
 
 
 def write_SAOCatalog_binary(obj, fname):
@@ -86,8 +87,44 @@ class SAOCatalog:
             logging.info(f"{i:5d} {id:10s} {radec.to_string('hmsdms', sep=':'):30s}  {vmag:4.2f}")
             i += 1
 
-    def find_nearby(self, tradec):
-        for pradec in self.radec:
-            sep = pradec.separation(tradec).degree
-            print(tradec, pradec, sep)
+    def find_stars_near_target(self, target, dist, minmag, maxmag, exclude=None):
+
+        t_ra_rad = target.ra.radian
+        t_dec_rad = target.dec.radian
+
+        #print(t_ra_rad, t_dec_rad)
+
+        # convert sao coords to radians
+        c_ra_rad = np.deg2rad(self.ra)
+        c_dec_rad = np.deg2rad(self.dec)
+
+        # equation for distance between two points on sphere
+        # try with haversine
+        ddec = t_dec_rad - c_dec_rad
+        dra = t_ra_rad - c_ra_rad
+        a = (np.sin(ddec/2)**2 + np.cos(t_dec_rad)*np.cos(c_dec_rad)*np.sin(dra/2)**2)
+        c = 2 * np.arcsin(np.sqrt(a))
+
+        #print(np.max(c), np.min(c), np.median(c))
+
+        #sortargs = np.argsort(c)
+        close_idx = np.where(c < np.deg2rad(dist))[0]
+
+        if exclude is not None:
+            #logging.info(f'exclude={exclude}')
+            #logging.info(f'pre-exclude: {close_idx}')
+            close_idx = np.setxor1d(close_idx, exclude)
+            #logging.debug(f'post-exclude: {close_idx}')
+
+        logging.debug(f'found {len(close_idx)} within {dist} degrees')
+
+        # filter by mag
+        mags = np.array(self.vmag)[close_idx]
+        mags_idx = np.where((mags < minmag) & (mags >= maxmag))[0]
+
+        logging.debug(f'found {len(mags_idx)} within {dist} degrees and {maxmag} < mag < {minmag}')
+        #logging.debug(f'mags_idx = {mags_idx}')
+        ret_idx = close_idx[mags_idx]
+        #logging.debug(f'ret_idx = {ret_idx}')
+        return ret_idx, c[ret_idx]
 

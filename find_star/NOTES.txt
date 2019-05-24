@@ -1,0 +1,55 @@
+Notes for code to find focus stars
+----------------------------------
+
+Last updated 2019/05/24
+
+Currently the code is based on a pull of the SAO Catalog from Vizier.
+
+The pulled file 'SAO_Catalog.dat' has 4 columns:
+
+SAO #, RA(J2000), DEC(J2000), Vmag, HD #, delFlag
+
+If the delFlag is 'D' then ignore the record.
+
+SAOCatalog Object
+-----------------
+The SAOCatalog object is used to hold the catalog once read with the
+load_SAO_Catalog_binary() function.  The write/load functions just pickle
+the SAOCatalog object to disk.  This is fairly fast.
+
+The original catalog file can be read in to initialize an SAOCatalog object
+using its read_catalog() method.  This is only necessary when creating the
+binary version of the catalog the first time.
+
+The read_catalog() function will filter out any catalog entries with delFlag
+set to 'D' as well as entries without a Vmag.
+
+When the catalog is created with saocatalog_create the max (brightest) and
+min (faintest) magnitudes as well as the minimum (Southernmost) declination
+can be specified to reduce the catalog size.
+
+The SAOCatalog is supposed to be complete to around 9th magnitude which is
+probably adequate for focus stars.
+
+find_nearby_stars.py
+--------------------
+The program find_nearby_stars reads the catalog (binary form) and accepts
+an RA/DEC (J2000) as well as a max/min magnitude range as well as a distance
+in which the candidates should fall.
+
+It searches the catalog for matching candidates, then for each candidate it
+will look to see how many stars in the catalog are within 1 degree of it.  It
+will reject any candidate with another star within 0.15 degrees.
+
+Finally it sorts the candidates by the number of nearby stars and returns the
+list.
+
+saocatalog_exclude_stars.py
+---------------------------
+This program goes through the SAO Catalog and flags any stars with another
+star within 0.15 degrees.  The list of catalog index numbers and SAO numbers
+are written to the file 'sao_exclude_lst.txt'.
+
+
+
+
