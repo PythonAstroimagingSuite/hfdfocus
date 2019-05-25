@@ -9,7 +9,7 @@ import logging
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
 
-from SAOCatalog import load_SAOCatalog_binary
+from hfdfocus.SAOCatalog import load_SAOCatalog_binary
 
 if __name__ == '__main__':
     logging.basicConfig(filename='find_star.log',

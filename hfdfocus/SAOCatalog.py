@@ -1,5 +1,6 @@
+import sys
 import logging
-import pickle
+from struct import pack, unpack, calcsize
 
 import numpy as np
 #from astropy import units as u
@@ -7,22 +8,105 @@ import numpy as np
 #from astropy.coordinates import FK5
 #from astropy.coordinates import Angle
 
+#def write_SAOCatalog_binary(obj, fname):
+#    f = open(fname, 'wb')
+#    pickle.dump(obj, f)
+#    f.close()
+#
+#def load_SAOCatalog_binary(fname):
+#    f = open(fname, 'rb')
+#    obj = pickle.load(f)
+#    f.close()
+#    return obj
 
-def write_SAOCatalog_binary(obj, fname):
+#
+# Binary format (preliminary!)
+#
+# nrec      (uint32)
+# minmag    (float32)
+# maxmag    (float32)
+# mindec    (float32)
+# epoch     (float32)
+# SAO ids   (nrec*int32)
+# RA (deg)  (nrec*float32)
+# DEC (deg) (nrec*float32)
+# Vmag      (nrec*float32)
+#
+def write_SAOCatalog_binary(saocat, fname):
     f = open(fname, 'wb')
-    pickle.dump(obj, f)
+
+    # make sure all lists the same length!
+    nelem = []
+    nelem.append(len(saocat.id))
+    nelem.append(len(saocat.ra))
+    nelem.append(len(saocat.dec))
+    nelem.append(len(saocat.vmag))
+
+    # just count first elem of nelem and if it is equal to len
+    # then all elem are the same
+    if nelem.count(nelem[0]) != len(nelem):
+        logging.error('write_SAOCatalog_binary(): Error - not all lists the same length!')
+        return None
+
+    nrec = nelem[0]
+    f.write(pack('I', nrec))
+    f.write(pack('f', saocat.minmag))
+    f.write(pack('f', saocat.maxmag))
+    f.write(pack('f', saocat.mindec))
+    f.write(pack('f', saocat.epoch))
+    f.write(pack(f'{nrec}I', *saocat.id))
+    f.write(pack(f'{nrec}f', *saocat.ra))
+    f.write(pack(f'{nrec}f', *saocat.dec))
+    f.write(pack(f'{nrec}f', *saocat.vmag))
     f.close()
+
 
 def load_SAOCatalog_binary(fname):
+
+    def unpack_next(f, fmt):
+        #print(fmt)
+        nr = calcsize(fmt)
+        b = f.read(nr)
+        return unpack(fmt, b)
+
+    saocat = SAOCatalog()
+
     f = open(fname, 'rb')
-    obj = pickle.load(f)
+    nrec = unpack_next(f, 'I')[0]
+    #print(nrec)
+    saocat.minmag = unpack_next(f, 'f')[0]
+    #print(saocat.minmag)
+    saocat.maxmag = unpack_next(f, 'f')[0]
+    #print(saocat.maxmag)
+    saocat.mindec = unpack_next(f, 'f')[0]
+    #print(saocat.mindec)
+    saocat.epoch = unpack_next(f, 'f')[0]
+    #print(saocat.epoch)
+    saocat.id = list(unpack_next(f, f'{nrec}I'))
+    saocat.ra = list(unpack_next(f, f'{nrec}f'))
+    saocat.dec = list(unpack_next(f, f'{nrec}f'))
+    saocat.vmag = list(unpack_next(f, f'{nrec}f'))
     f.close()
-    return obj
+
+    # make sure all lists the same length!
+    nelem = []
+    nelem.append(len(saocat.id))
+    nelem.append(len(saocat.ra))
+    nelem.append(len(saocat.dec))
+    nelem.append(len(saocat.vmag))
+    #print(nelem)
+
+    # just count first elem of nelem and if it is equal to len
+    # then all elem are the same
+    if nelem.count(nelem[0]) != len(nelem):
+        logging.error('load_SAOCatalog_binary(): Error - not all lists the same length!')
+        return None
+    else:
+        return saocat
 
 class SAOCatalog:
     def __init__(self):
         self.id = []
-        self.radec = []
         self.epoch = 2000.0
         self.ra = []
         self.dec = []
@@ -30,64 +114,6 @@ class SAOCatalog:
         self.maxmag = None
         self.minmag = None
         self.mindec = None
-
-    def read_catalog(self, maxmag, minmag, mindec):
-        f = open('SAO_Catalog.dat')
-        first = True
-        nread = 0
-        self.maxmag = maxmag
-        self.minmag = minmag
-        self.mindec = mindec
-        for l in f.readlines():
-            if first:
-                first = False
-                continue
-            fields = l.strip().split(',')
-#            print(l.rstrip())
-#            print(fields)
-
-            if fields[5] == 'D':
-                print('skipping ', fields[0])
-                continue
-
-            hid = fields[0]
-            ra_deg = fields[1]
-            dec_deg = fields[2]
-            vmag = fields[3]
-            hd = fields[4].strip('"').strip()
-
-            try:
-                vmag = float(vmag)
-                if vmag >= minmag or vmag < maxmag:
-                    continue
-                if float(dec_deg) < mindec:
-                    continue
-            except Exception as err:
-                logging.error(f'Error processing #1 |{l.rstrip()}| |{vmag}| {err}')
-                continue
-
-            try:
-                self.id.append(int(hid))
-                self.ra.append(float(ra_deg))
-                self.dec.append(float(dec_deg))
-                self.vmag.append(float(vmag))
-            except Exception as err:
-                logging.error(f'Error processing #2 |{l.rstrip()}| |{vmag}| {err}')
-                continue
-
-            nread += 1
-            if nread % 1000 == 0:
-                logging.info(f'{nread} read')
-#            if nread > 100:
-#                break
-
-        f.close()
-        logging.info(f'# stars loaded = {nread}')
-
-        i = 1
-        for id, radec, vmag in zip(self.id, self.radec, self.vmag):
-            logging.info(f"{i:5d} {id:10s} {radec.to_string('hmsdms', sep=':'):30s}  {vmag:4.2f}")
-            i += 1
 
     def find_stars_near_target(self, target, dist, minmag, maxmag, exclude=None):
 
