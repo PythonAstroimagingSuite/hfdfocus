@@ -110,12 +110,12 @@ def measure_at_focus_pos(fpos, focus_expos):
     if not args.simul:
         if focuser.get_absolute_position() != fpos:
             logging.info(f'Moving focuser to {fpos}')
-            move_focuser(focuser, fpos)
+            move_focuser(fpos)
             time.sleep(args.focusdelay)
 
     imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos}.fit')
     if not args.simul:
-        rc = take_exposure_and_measure_star(cam, imgname, focus_expos)
+        rc = take_exposure_and_measure_star(imgname, focus_expos)
     else:
         tmp_starimage_data = simul_star.get_simul_star_image(fpos)
         pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
@@ -127,7 +127,7 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
     if not args.simul:
         if focuser.get_absolute_position() != fpos:
             logging.info(f'Moving focuser to {fpos}')
-            move_focuser(focuser, fpos)
+            move_focuser(fpos)
             time.sleep(args.focusdelay)
 
     avg_hfd = 0
@@ -135,7 +135,7 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
     for i in range(0, niter):
         imgname = os.path.join(imagesdir, f'vcurve_focuspos_{tag}{i:02d}_{fpos}.fit')
         if not args.simul:
-            hfd = take_exposure_and_measure_star(cam, imgname, focus_expos)
+            hfd = take_exposure_and_measure_star(imgname, focus_expos)
         else:
             tmp_starimage_data = simul_star.get_simul_star_image(fpos)
             pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
@@ -168,8 +168,8 @@ def parse_commandline():
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
     parser.add_argument('--debugplotsdelay', type=float, default=1, help='Delay (seconds) showing each plot')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
-    parser.add_argument('--focuser_driver', type=str,  help='Focuser Driver')
-    parser.add_argument('--camera_driver', type=str,  help='Camera Driver')
+    parser.add_argument('--focuser', type=str,  help='Focuser Driver')
+    parser.add_argument('--camera', type=str,  help='Camera Driver')
     parser.add_argument('--exposure_start', default=1, type=int,  help='Starting exposure value')
     parser.add_argument('--exposure_min', default=1, type=int,  help='Minimum exposure value')
     parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
@@ -208,17 +208,17 @@ if __name__ == '__main__':
         sdi.connect_backend()
 
         #focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
-        logging.info(f'Connecting to focuser driver {args.focuser_driver}')
-        focuser = sdi.connect_focuser(args.focuser_driver)
+        logging.info(f'Connecting to focuser driver {args.focuser}')
+        focuser = sdi.connect_focuser(args.focuser)
         logging.info(f'focuser = {focuser}')
         if not focuser:
-            logging.error(f'Unabled to connect to focuser driver {args.focuser_driver}')
+            logging.error(f'Unabled to connect to focuser driver {args.focuser}')
 
-        logging.info(f'Connecting to camera driver {args.camera_driver}')
-        cam = sdi.connect_camera(args.camera_driver)
+        logging.info(f'Connecting to camera driver {args.camera}')
+        cam = sdi.connect_camera(args.camera)
         logging.info(f'cam = {cam}')
         if not cam:
-            logging.error(f'Unabled to connect to camera driver {args.camera_driver}')
+            logging.error(f'Unabled to connect to camera driver {args.camera}')
     else:
         simul_star = C8_F7_Star_Simulator()
 
@@ -336,20 +336,24 @@ if __name__ == '__main__':
     backlash = 200
     fpos_pre_initial = fpos_initial - fdir*backlash
 
-    hfd_initial = measure_at_focus_pos(fpos_pre_initial, focus_expos)
+    logging.info(f'Moving to pre-initial pos {fpos_pre_initial}')
+    move_focuser(fpos_pre_initial)
+    time.sleep(0.5)
 
-    if hfd_initial is None:
-        logging.error('No star found!')
-        if args.debugplots:
-            plt.show()
-        sys.exit(1)
-
-    logging.info(f'INITIAL POSITION FOCUS = {fpos_initial}  HFD = {hfd_initial}')
-
-    if args.debugplots:
-        fig.suptitle(f'Initial position focus {fpos_initial} HFD {hfd_initial:5.2f}')
-        fig.show()
-        plt.pause(args.debugplotsdelay)
+#    hfd_initial = measure_at_focus_pos(fpos_pre_initial, focus_expos)
+#
+#    if hfd_initial is None:
+#        logging.error('No star found!')
+#        if args.debugplots:
+#            plt.show()
+#        sys.exit(1)
+#
+#    logging.info(f'INITIAL POSITION FOCUS = {fpos_initial}  HFD = {hfd_initial}')
+#
+#    if args.debugplots:
+#        fig.suptitle(f'Initial position focus {fpos_initial} HFD {hfd_initial:5.2f}')
+#        fig.show()
+#        plt.pause(args.debugplotsdelay)
 
     # now take several measurements and get average HFD
     avg_initial_hfd = average_measure_at_focus_pos(fpos_initial, focus_expos, args.numaverage, tag='initial')
@@ -359,7 +363,7 @@ if __name__ == '__main__':
     # now based on average at initial compute inner HFD location
     # compute location for desired initial HFD
     inner_hfd = 12
-    fpos_inner = fpos_2 + fdir*int(abs((inner_hfd-hfd_2)/vslope))
+    fpos_inner = fpos_initial + fdir*int(abs((inner_hfd-avg_initial_hfd)/vslope))
     logging.info(f'Inner HFD = {inner_hfd} pred focus = {fpos_inner}')
 
     hfd_inner = measure_at_focus_pos(fpos_inner, focus_expos)
