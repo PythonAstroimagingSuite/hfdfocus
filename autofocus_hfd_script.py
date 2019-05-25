@@ -34,7 +34,7 @@ def measure_frame(starimage_data):
     bg = 800
     thres = 10000
 
-    xcen, ycen, bg, mad, starmask = find_star(starimage_data, debugfits=True)
+    xcen, ycen, bg, mad, starmask, alone = find_star(starimage_data, debugfits=True)
 
     if np.max(starimage_data[starmask] > args.saturation):
         logging.warning(f'SATURATED PIXELS DETECTED!')

@@ -270,11 +270,11 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     axes = get_major_minor_axes(dilate_star_model[max_l])
     majax = axes[0][2]
     minax = axes[1][2]
-    ecc = math.sqrt(1.0-(minax/majax))
-    logging.debug(f'Major/Minor/Ecc = {majax} {minax} {ecc}')
+    ecc = math.sqrt(1.0-(minax/majax)**2)
+    logging.info(f'Major/Minor/Ecc = {majax} {minax} {ecc}')
 
-    if abs(0.5-ecc) > 0.1:
-        logging.warning('fERROR find_star(): Eccentricity {ecc} is outside acceptable range - probably not alone')
+    if ecc > 0.75:
+        logging.warning(f'fERROR find_star(): Eccentricity {ecc} is outside acceptable range - probably not alone')
         alone = False
 
 
