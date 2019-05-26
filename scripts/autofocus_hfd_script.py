@@ -24,10 +24,10 @@ ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
 #from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
 
 
-from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
+from hfdfocus.StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 
 # for simulator
-from c8_simul_star import C8_F7_Star_Simulator
+from hfdfocus.c8_simul_star import C8_F7_Star_Simulator
 
 def measure_frame(starimage_data):
     # analyze frame
@@ -168,6 +168,7 @@ def parse_commandline():
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
     parser.add_argument('--debugplotsdelay', type=float, default=1, help='Delay (seconds) showing each plot')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
+    parser.add_argument('--stayopen', action='store_true', help='stay open when done')
     parser.add_argument('--focuser', type=str,  help='Focuser Driver')
     parser.add_argument('--camera', type=str,  help='Camera Driver')
     parser.add_argument('--exposure_start', default=1, type=int,  help='Starting exposure value')
@@ -180,7 +181,9 @@ def parse_commandline():
     parser.add_argument('--focusdelay', default=0.5, type=float,  help='Delay (seconds) after focus moves')
     parser.add_argument('--numaverage', default=5, type=int,  help='Number of images to average')
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    return args
+
 
 if __name__ == '__main__':
     logging.basicConfig(filename='sample_vcurve.log',
@@ -337,8 +340,9 @@ if __name__ == '__main__':
     fpos_pre_initial = fpos_initial - fdir*backlash
 
     logging.info(f'Moving to pre-initial pos {fpos_pre_initial}')
-    move_focuser(fpos_pre_initial)
-    time.sleep(0.5)
+    if not args.simul:
+        move_focuser(fpos_pre_initial)
+        time.sleep(0.5)
 
 #    hfd_initial = measure_at_focus_pos(fpos_pre_initial, focus_expos)
 #
@@ -409,4 +413,7 @@ if __name__ == '__main__':
 
     # keep plots up until keypress
     if args.debugplots:
-        plt.show()
+        if args.stayopen:
+            plt.show()
+        else:
+            plt.pause(5)

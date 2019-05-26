@@ -1,5 +1,4 @@
 # find closest star within mag range
-# FIXME DOES NOT CONSIDER MERIDAN FLIP IMPLICATIONS!
 import os
 import sys
 import numpy as np
@@ -280,7 +279,7 @@ if __name__ == '__main__':
             radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx],
                              unit=u.deg, frame='fk5', equinox='J2000')
 
-            f.write(f"{cat_idx}, {np.rad2deg(nnear_dist[near_idx])}." \
+            f.write(f"{cat_idx}, {np.rad2deg(nnear_dist[near_idx])}," \
                     f" {saocat.id[cat_idx]}," \
                     f" {radec.ra.to_string(unit=u.hour, sep=':', precision=3)},"\
                     f" {radec.dec.to_string(unit=u.degree, sep=':', precision=3)},"\

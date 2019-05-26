@@ -24,7 +24,7 @@ import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
 #import skimage.transform as tf
 import scipy.ndimage as ndimage
-from StarFitHFD import find_brightest_star_HFD
+from hfdfocus.StarFitHFD import find_brightest_star_HFD
 
 def parse_commandline():
     parser = argparse.ArgumentParser()
@@ -66,8 +66,8 @@ def shrink_star(starimage_data, bgimage_data, reduction):
 
 
 class C8_F7_Star_Simulator:
-    def __init__(self, starimage_name='data/C8_Simul_Defocus_Star.fit',
-                 bgimage_name='data/C8_Simul_BG.fit',
+    def __init__(self, starimage_name='../data/C8_Simul_Defocus_Star.fit',
+                 bgimage_name='../data/C8_Simul_BG.fit',
                  companion_offset=None, companion_flux_ratio=1.0):
 
         # load background image
