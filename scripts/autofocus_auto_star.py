@@ -239,13 +239,15 @@ def run_autofocus(args, extra_args):
     parser.add_argument('--focuser', type=str,  help='Focuser Driver')
     parser.add_argument('--camera', type=str, help='Name of camera driver')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
+    parser.add_argument('--debugplots', action='store_true', help='Show plots')
     dev_args, unknown = parser.parse_known_args(sys.argv)
 
     cmd_line = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
     cmd_line += 'autofocus_hfd_script.py '
     #FIXME defaults for C8
     cmd_line += '6000 12000 IN '
-    cmd_line += '--debugplots '
+    if dev_args.debugplots:
+        cmd_line += '--debugplots '
     if dev_args.simul:
         cmd_line += '--simul '
      # use json to handle double quotes in camera and telescope
