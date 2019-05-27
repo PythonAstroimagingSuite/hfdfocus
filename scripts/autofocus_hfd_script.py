@@ -13,7 +13,10 @@ import matplotlib as mpl
 mpl.rc('font', size=8)
 import matplotlib.pyplot as plt
 
-ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
+from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
+from pyastroprofile.EquipmentProfile import EquipmentProfile
+
+#ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
 
 #from pyastrobackend.SimpleDeviceInterface import connect_backend
 #from pyastrobackend.SimpleDeviceInterface import connect_focuser
@@ -169,6 +172,7 @@ def parse_commandline():
     parser.add_argument('--debugplotsdelay', type=float, default=1, help='Delay (seconds) showing each plot')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
     parser.add_argument('--stayopen', action='store_true', help='stay open when done')
+    parser.add_argument('--profile', type=str, help='Name of equipment profile')
     parser.add_argument('--focuser', type=str,  help='Focuser Driver')
     parser.add_argument('--camera', type=str,  help='Camera Driver')
     parser.add_argument('--exposure_start', default=1, type=int,  help='Starting exposure value')
@@ -205,23 +209,34 @@ if __name__ == '__main__':
 
     # connect focuser and camera
     if not args.simul:
-        from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
+
+        # load profile
+        if args.profile is not None:
+            logging.info(f'Using equipment profile {args.profile}')
+            equip_profile = EquipmentProfile('astroprofiles/equipment', args.profile)
+            equip_profile.read()
+            camera_driver = equip_profile.camera_driver
+            focuser_driver = equip_profile.telescope_driver
+        else:
+            focuser_driver = args.focuser
+            camera_driver = args.camera
+
         sdi = SDI()
 
         sdi.connect_backend()
 
         #focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
         logging.info(f'Connecting to focuser driver {args.focuser}')
-        focuser = sdi.connect_focuser(args.focuser)
+        focuser = sdi.connect_focuser(focuser_driver)
         logging.info(f'focuser = {focuser}')
         if not focuser:
-            logging.error(f'Unabled to connect to focuser driver {args.focuser}')
+            logging.error(f'Unabled to connect to focuser driver {focuser_driver}')
 
         logging.info(f'Connecting to camera driver {args.camera}')
-        cam = sdi.connect_camera(args.camera)
+        cam = sdi.connect_camera(camera_driver)
         logging.info(f'cam = {cam}')
         if not cam:
-            logging.error(f'Unabled to connect to camera driver {args.camera}')
+            logging.error(f'Unabled to connect to camera driver {camera_driver}')
     else:
         simul_star = C8_F7_Star_Simulator()
 

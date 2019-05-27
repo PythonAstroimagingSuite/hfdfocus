@@ -13,13 +13,24 @@ import logging
 import subprocess
 import numpy as np
 
-
 def run_platesolve(pixelscale):
+    # parse out device info
+    # FIXME seems alot of duplication need a better way to represent
+    # device info like a config file
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--profile', type=str, help='Name of equipment profile')
+    dev_args, unknown = parser.parse_known_args(sys.argv)
+
+    logging.debug(f'run_platesolve: dev_args, unknown = {dev_args} {unknown}')
+
     result_fname = '/tmp/autofocus_auto_origpos.json'
     cmd_line = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
     cmd_line += '../../pyastrometry/scripts/pyastrometry_cli_main.py solvepos '
     cmd_line += f'--outfile {result_fname} '
-    cmd_line += f'--pixelscale {pixelscale}'
+    cmd_line += f'--pixelscale {pixelscale} '
+    if dev_args.profile is not None:
+        cmd_line += f'--profile {dev_args.profile}'
 
     cmd_args = shlex.split(cmd_line)
 
@@ -99,8 +110,8 @@ def run_findstars(curpos, args):
 
     cmd_args = shlex.split(cmd_line)
 
-    logging.debug(f'run_platesolve() command line = |{cmd_line}|')
-    logging.debug(f'run_platesolve() command args = |{cmd_args}|')
+    logging.debug(f'run_findstars() command line = |{cmd_line}|')
+    logging.debug(f'run_findstars() command args = |{cmd_args}|')
 
     # unlink previous solve if any
     if os.path.isfile(result_fname):
@@ -173,6 +184,7 @@ def run_precise_slew(target, args, extra_args):
     # device info like a config file
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--profile', type=str, help='Name of equipment profile')
     parser.add_argument('--telescope', type=str, help='Name of telescope driver')
     parser.add_argument('--camera', type=str, help='Name of camera driver')
     parser.add_argument('--exposure', type=float, default=5, help='Exposure time')
@@ -192,15 +204,19 @@ def run_precise_slew(target, args, extra_args):
     # use json to handle double quotes in camera and telescope
     # arguments which might be passed as something like "CCD Simulator"
     # and the shlex.split() will split them
-    cmd_line += f'--camera {json.dumps(dev_args.camera)} '
-    cmd_line += f'--telescope {json.dumps(dev_args.telescope)} '
+    if dev_args.camera is not None:
+        cmd_line += f'--camera {json.dumps(dev_args.camera)} '
+    if dev_args.telescope is not None:
+        cmd_line += f'--telescope {json.dumps(dev_args.telescope)} '
     cmd_line += f'--exposure {dev_args.exposure} '
     cmd_line += f'--binning {dev_args.binning} '
+    if dev_args.profile is not None:
+        cmd_line += f'--profile {dev_args.profile}'
 
     cmd_args = shlex.split(cmd_line)
 
-    logging.debug(f'run_platesolve() command line = |{cmd_line}|')
-    logging.debug(f'run_platesolve() command args = |{cmd_args}|')
+    logging.debug(f'run_precise_slew() command line = |{cmd_line}|')
+    logging.debug(f'run_precise_slew() command args = |{cmd_args}|')
 
     # unlink previous solve if any
 #    if os.path.isfile(result_fname):
