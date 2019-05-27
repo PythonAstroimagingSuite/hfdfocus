@@ -13,6 +13,16 @@ import logging
 import subprocess
 import numpy as np
 
+# FIXME this should be handled automaticall!
+
+if os.name == 'nt':
+    PYTHON_EXE_PATH = 'C:\\Users\\msf\\Anaconda3\\envs\\AstronomyUtilitiesPipNumpy\\python'
+elif os.name == 'posix':
+    PYTHON_EXE_PATH = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
+else:
+    logging.error('PYTHON_EXE_PATH NOT SET')
+    sys.exit(1)
+
 def run_platesolve(pixelscale):
     # parse out device info
     # FIXME seems alot of duplication need a better way to represent
@@ -24,8 +34,8 @@ def run_platesolve(pixelscale):
 
     logging.debug(f'run_platesolve: dev_args, unknown = {dev_args} {unknown}')
 
-    result_fname = '/tmp/autofocus_auto_origpos.json'
-    cmd_line = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
+    result_fname = './autofocus_auto_origpos.json'
+    cmd_line = PYTHON_EXE_PATH + ' '
     cmd_line += '../../pyastrometry/scripts/pyastrometry_cli_main.py solvepos '
     cmd_line += f'--outfile {result_fname} '
     cmd_line += f'--pixelscale {pixelscale} '
@@ -41,7 +51,12 @@ def run_platesolve(pixelscale):
     if os.path.isfile(result_fname):
         os.unlink(result_fname)
 
-    ps_proc = subprocess.Popen(cmd_args,
+    if os.name == 'nt':
+        cmd_val = cmd_line
+    elif os.name == 'posix':
+        cmd_val = cmd_args
+        
+    ps_proc = subprocess.Popen(cmd_val,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,
@@ -89,8 +104,8 @@ def run_platesolve(pixelscale):
     return radec
 
 def run_findstars(curpos, args):
-    result_fname = '/tmp/autofocus_auto_starlist.dat'
-    cmd_line = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
+    result_fname = './autofocus_auto_starlist.dat'
+    cmd_line = PYTHON_EXE_PATH + ' '
     #cmd_line = 'python '
     cmd_line += 'find_nearby_stars.py '
     cmd_line += '../data/SAO_Catalog_m5_p11_filtered.bin '
@@ -117,7 +132,12 @@ def run_findstars(curpos, args):
     if os.path.isfile(result_fname):
         os.unlink(result_fname)
 
-    ps_proc = subprocess.Popen(cmd_args,
+    if os.name == 'nt':
+        cmd_val = cmd_line
+    elif os.name == 'posix':
+        cmd_val = cmd_args
+        
+    ps_proc = subprocess.Popen(cmd_val,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,
@@ -189,18 +209,21 @@ def run_precise_slew(target, args, extra_args):
     parser.add_argument('--camera', type=str, help='Name of camera driver')
     parser.add_argument('--exposure', type=float, default=5, help='Exposure time')
     parser.add_argument('--binning', type=int, default=2, help='Camera binning')
+    parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     dev_args, unknown = parser.parse_known_args(sys.argv)
 
     logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
 
-    cmd_line = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
+    cmd_line = PYTHON_EXE_PATH + ' '
     cmd_line += '../../pyastrometry/scripts/pyastrometry_cli_main.py slewsolve '
     rastr = target.ra.to_string(u.hour, sep=":", pad=True)
     cmd_line += rastr + ' '
     decstr = target.dec.to_string(alwayssign=True, sep=":", pad=True)
     cmd_line += f'" {decstr}" '
     cmd_line += f'--pixelscale {args.pixelscale} '
-
+    if dev_args.framesize is not None:
+        cmd_line += f'--framesize {dev_args.framesize} '
+        
     # use json to handle double quotes in camera and telescope
     # arguments which might be passed as something like "CCD Simulator"
     # and the shlex.split() will split them
@@ -222,7 +245,12 @@ def run_precise_slew(target, args, extra_args):
 #    if os.path.isfile(result_fname):
 #        os.unlink(result_fname)
 
-    ps_proc = subprocess.Popen(cmd_args,
+    if os.name == 'nt':
+        cmd_val = cmd_line
+    elif os.name == 'posix':
+        cmd_val = cmd_args
+        
+    ps_proc = subprocess.Popen(cmd_val,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,
@@ -252,13 +280,16 @@ def run_precise_slew(target, args, extra_args):
 def run_autofocus(args, extra_args):
     # FIXME need to add parameters for autofocus
     parser = argparse.ArgumentParser()
+    parser.add_argument('--profile', type=str, help='Name of equipment profile')
     parser.add_argument('--focuser', type=str,  help='Focuser Driver')
     parser.add_argument('--camera', type=str, help='Name of camera driver')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
     parser.add_argument('--debugplots', action='store_true', help='Show plots')
+    parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     dev_args, unknown = parser.parse_known_args(sys.argv)
+    logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
 
-    cmd_line = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
+    cmd_line = PYTHON_EXE_PATH + ' '
     cmd_line += 'autofocus_hfd_script.py '
     #FIXME defaults for C8
     cmd_line += '6000 12000 IN '
@@ -266,13 +297,17 @@ def run_autofocus(args, extra_args):
         cmd_line += '--debugplots '
     if dev_args.simul:
         cmd_line += '--simul '
-     # use json to handle double quotes in camera and telescope
+    if dev_args.framesize:
+        cmd_line += f'--framesize {dev_args.framesize} '
+    # use json to handle double quotes in camera and telescope
     # arguments which might be passed as something like "CCD Simulator"
     # and the shlex.split() will split them
-    cmd_line += f'--camera {json.dumps(dev_args.camera)} '
-    cmd_line += f'--focuser {json.dumps(dev_args.focuser)} '
-
-    logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
+    if dev_args.camera is not None:
+        cmd_line += f'--camera {json.dumps(dev_args.camera)} '
+    if dev_args.focuser is not None:
+        cmd_line += f'--focuser {json.dumps(dev_args.focuser)} '
+    if dev_args.profile is not None:
+        cmd_line += f'--profile {dev_args.profile}'
 
     cmd_args = shlex.split(cmd_line)
 
@@ -283,7 +318,12 @@ def run_autofocus(args, extra_args):
 #    if os.path.isfile(result_fname):
 #        os.unlink(result_fname)
 
-    ps_proc = subprocess.Popen(cmd_args,
+    if os.name == 'nt':
+        cmd_val = cmd_line
+    elif os.name == 'posix':
+        cmd_val = cmd_args
+        
+    ps_proc = subprocess.Popen(cmd_val,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,

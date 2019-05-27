@@ -216,7 +216,7 @@ if __name__ == '__main__':
             equip_profile = EquipmentProfile('astroprofiles/equipment', args.profile)
             equip_profile.read()
             camera_driver = equip_profile.camera_driver
-            focuser_driver = equip_profile.telescope_driver
+            focuser_driver = equip_profile.focuser_driver
         else:
             focuser_driver = args.focuser
             camera_driver = args.camera
@@ -226,13 +226,13 @@ if __name__ == '__main__':
         sdi.connect_backend()
 
         #focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
-        logging.info(f'Connecting to focuser driver {args.focuser}')
+        logging.info(f'Connecting to focuser driver {focuser_driver}')
         focuser = sdi.connect_focuser(focuser_driver)
         logging.info(f'focuser = {focuser}')
         if not focuser:
             logging.error(f'Unabled to connect to focuser driver {focuser_driver}')
 
-        logging.info(f'Connecting to camera driver {args.camera}')
+        logging.info(f'Connecting to camera driver {camera_driver}')
         cam = sdi.connect_camera(camera_driver)
         logging.info(f'cam = {cam}')
         if not cam:
