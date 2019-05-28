@@ -39,6 +39,11 @@ if __name__ == '__main__':
     parser.add_argument('--onlypierside', type=str, help='EAST or WEST side only')
     parser.add_argument('--meridianthres', type=str, default='00:30:00',
                         help='How close to meridian is allowed (hh:mm:ss)')
+    parser.add_argument('--lat', type=float, help='Location latitude')
+    parser.add_argument('--lon', type=float, help='Location longitude')
+    parser.add_argument('--tz', type=str, help='Location tz')
+    parser.add_argument('--allowflip', action='store_true', help='Allow meridian flip to find star')
+
 
     args = parser.parse_args()
 

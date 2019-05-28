@@ -15,13 +15,64 @@ import numpy as np
 
 # FIXME this should be handled automaticall!
 
-if os.name == 'nt':
-    PYTHON_EXE_PATH = 'C:\\Users\\msf\\Anaconda3\\envs\\AstronomyUtilitiesPipNumpy\\python'
-elif os.name == 'posix':
-    PYTHON_EXE_PATH = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
-else:
-    logging.error('PYTHON_EXE_PATH NOT SET')
-    sys.exit(1)
+#if os.name == 'nt':
+#    PYTHON_EXE_PATH = 'C:\\Users\\msf\\Anaconda3\\envs\\AstronomyUtilitiesPipNumpy\\python'
+#elif os.name == 'posix':
+#    PYTHON_EXE_PATH = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
+#else:
+#    logging.error('PYTHON_EXE_PATH NOT SET')
+#    sys.exit(1)
+
+# find interpretter we're running under and use it?
+PYTHON_EXE_PATH = sys.executable
+
+def run_program(cmd_line, label='', trimlog=True):
+    """ runs exec_path with cmd_line returning the return code rc and stdout
+        and stderr output as output """
+
+    # seems like we have to do things differently for Windows and Linux
+    if os.name == 'nt':
+        cmd_val = cmd_line
+    elif os.name == 'posix':
+        cmd_val = shlex.split(cmd_line)
+
+    logging.debug(f'run_program() command value = |{cmd_val}|')
+
+    with subprocess.Popen(cmd_val,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                universal_newlines=True) as ps_proc:
+
+        if label == '':
+            label = 'run_program()'
+        logging.debug('ps_proc output:')
+        output = ''
+        for l in ps_proc.stdout:
+            if trimlog:
+                # get rid of first 3 'words' which are the
+                # logging info from program
+                words = l.strip().split(' ')
+                out = ' '.join(words[3:])
+            else:
+                out = l.strip()
+            logging.debug(f'{label}: {out}')
+            output += l
+        logging.debug('end of output')
+
+#    poll_value = None
+#    while True:
+#        poll_value = ps_proc.poll()
+#
+#        if poll_value is not None:
+#            break
+
+    # check return code
+    rc = ps_proc.returncode
+
+    logging.debug(f'run_program: return code was {rc}!')
+    return rc, output
+
 
 def run_platesolve(pixelscale):
     # parse out device info
@@ -42,40 +93,11 @@ def run_platesolve(pixelscale):
     if dev_args.profile is not None:
         cmd_line += f'--profile {dev_args.profile}'
 
-    cmd_args = shlex.split(cmd_line)
-
-    logging.debug(f'run_platesolve() command line = |{cmd_line}|')
-    logging.debug(f'run_platesolve() command args = |{cmd_args}|')
-
     # unlink previous solve if any
     if os.path.isfile(result_fname):
         os.unlink(result_fname)
 
-    if os.name == 'nt':
-        cmd_val = cmd_line
-    elif os.name == 'posix':
-        cmd_val = cmd_args
-        
-    ps_proc = subprocess.Popen(cmd_val,
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                universal_newlines=True)
-
-    logging.debug('ps_proc output:')
-    for l in ps_proc.stdout.readlines():
-        logging.debug(f'ps_proc: {l.strip()}')
-    logging.debug('end of output')
-
-    poll_value = None
-    while True:
-        poll_value = ps_proc.poll()
-
-        if poll_value is not None:
-            break
-
-    # check return code
-    rc = ps_proc.returncode
+    rc, output = run_program(cmd_line, label='platesolve')
 
     if rc < 0:
         logging.error(f'run_platesolve: return code was {rc}!')
@@ -123,40 +145,11 @@ def run_findstars(curpos, args):
     if args.meridianthres is not None:
         cmd_line += f' --meridianthres {args.meridianthres}'
 
-    cmd_args = shlex.split(cmd_line)
-
-    logging.debug(f'run_findstars() command line = |{cmd_line}|')
-    logging.debug(f'run_findstars() command args = |{cmd_args}|')
-
     # unlink previous solve if any
     if os.path.isfile(result_fname):
         os.unlink(result_fname)
 
-    if os.name == 'nt':
-        cmd_val = cmd_line
-    elif os.name == 'posix':
-        cmd_val = cmd_args
-        
-    ps_proc = subprocess.Popen(cmd_val,
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                universal_newlines=True)
-
-    logging.debug('ps_proc output:')
-    for l in ps_proc.stdout.readlines():
-        logging.debug(f'ps_proc: {l.strip()}')
-    logging.debug('end of output')
-
-    poll_value = None
-    while True:
-        poll_value = ps_proc.poll()
-
-        if poll_value is not None:
-            break
-
-    # check return code
-    rc = ps_proc.returncode
+    rc, output = run_program(cmd_line, label='findstars')
 
     if rc != 0:
         logging.error(f'run_findstars: return code was {rc}!')
@@ -223,7 +216,7 @@ def run_precise_slew(target, args, extra_args):
     cmd_line += f'--pixelscale {args.pixelscale} '
     if dev_args.framesize is not None:
         cmd_line += f'--framesize {dev_args.framesize} '
-        
+
     # use json to handle double quotes in camera and telescope
     # arguments which might be passed as something like "CCD Simulator"
     # and the shlex.split() will split them
@@ -236,40 +229,7 @@ def run_precise_slew(target, args, extra_args):
     if dev_args.profile is not None:
         cmd_line += f'--profile {dev_args.profile}'
 
-    cmd_args = shlex.split(cmd_line)
-
-    logging.debug(f'run_precise_slew() command line = |{cmd_line}|')
-    logging.debug(f'run_precise_slew() command args = |{cmd_args}|')
-
-    # unlink previous solve if any
-#    if os.path.isfile(result_fname):
-#        os.unlink(result_fname)
-
-    if os.name == 'nt':
-        cmd_val = cmd_line
-    elif os.name == 'posix':
-        cmd_val = cmd_args
-        
-    ps_proc = subprocess.Popen(cmd_val,
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                universal_newlines=True)
-
-    logging.debug('ps_proc output:')
-    for l in ps_proc.stdout.readlines():
-        logging.debug(f'ps_proc: {l.strip()}')
-    logging.debug('end of output')
-
-    poll_value = None
-    while True:
-        poll_value = ps_proc.poll()
-
-        if poll_value is not None:
-            break
-
-    # check return code
-    rc = ps_proc.returncode
+    rc, output = run_program(cmd_line, label='precise_slew')
 
     if rc != 0:
         logging.error(f'run_precise_slew: return code was {rc}!')
@@ -292,7 +252,8 @@ def run_autofocus(args, extra_args):
     cmd_line = PYTHON_EXE_PATH + ' '
     cmd_line += 'autofocus_hfd_script.py '
     #FIXME defaults for C8
-    cmd_line += '6000 12000 IN '
+    cmd_line += f'{args.focusmin} {args.focusmax} '
+    cmd_line += f'{args.focusdir} '
     if dev_args.debugplots:
         cmd_line += '--debugplots '
     if dev_args.simul:
@@ -309,40 +270,8 @@ def run_autofocus(args, extra_args):
     if dev_args.profile is not None:
         cmd_line += f'--profile {dev_args.profile}'
 
-    cmd_args = shlex.split(cmd_line)
+    rc, output = run_program(cmd_line, label='autofocus')
 
-    logging.debug(f'autofocus command line = |{cmd_line}|')
-    logging.debug(f'autofocus command args = |{cmd_args}|')
-
-    # unlink previous solve if any
-#    if os.path.isfile(result_fname):
-#        os.unlink(result_fname)
-
-    if os.name == 'nt':
-        cmd_val = cmd_line
-    elif os.name == 'posix':
-        cmd_val = cmd_args
-        
-    ps_proc = subprocess.Popen(cmd_val,
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                universal_newlines=True)
-
-    logging.debug('ps_proc output:')
-    for l in ps_proc.stdout.readlines():
-        logging.debug(f'ps_proc: {l.strip()}')
-    logging.debug('end of output')
-
-    poll_value = None
-    while True:
-        poll_value = ps_proc.poll()
-
-        if poll_value is not None:
-            break
-
-    # check return code
-    rc = ps_proc.returncode
     logging.debug(f'autofocus rc = {rc}')
     if rc != 0:
         logging.error(f'run_autofocus: return code was {rc}!')
@@ -370,6 +299,9 @@ if __name__ == '__main__':
     log.addHandler(ch)
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('focusmin', type=int, help='Min allowed focuser pos')
+    parser.add_argument('focusmax', type=int, help='Max allowed focuser pos')
+    parser.add_argument('focusdir', type=str, help='Focus IN or OUT')
     parser.add_argument('dist', type=float, help='Max distance in degrees')
     parser.add_argument('mag', type=float, help='Desired mag focus star')
     parser.add_argument('lst', type=str, help='Local sidereal time')
@@ -377,6 +309,8 @@ if __name__ == '__main__':
     parser.add_argument('pixelscale', type=float, help='Pixel scale for plate solving')
     parser.add_argument('--meridianthres', type=str, default='00:30:00',
                         help='How close to meridian is allowed (hh:mm:ss)')
+    parser.add_argument('--maxtries', type=int, default=3,
+                        help='Number of stars to try before giving up')
 
     args, extra_args = parser.parse_known_args()
 
@@ -396,6 +330,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     result = None
+    ntries = 0
     for sao, radec in star_list:
         logging.info(f'Trying SAO{sao} at {radec.to_string("hmsdms", sep=":")}')
 
@@ -406,7 +341,12 @@ if __name__ == '__main__':
         if slew_result:
             focus_result = run_autofocus(args, extra_args)
             if not focus_result:
-                logging.error('Autofocus failed - trying next candidate!')
+                ntries += 1
+                if ntries <= args.maxtries:
+                    logging.error(f'Autofocus failed - trying next candidate (try {ntries} of {args.maxtries}!')
+                else:
+                    logging.error(f'Autofocus failed - tried max {args.maxtgies} already - quitting!')
+                    sys.exit(-1)
                 continue
             else:
                 logging.info(f'Autofocus suceeded - result = {focus_result}')
@@ -414,10 +354,14 @@ if __name__ == '__main__':
                 break
         else:
             logging.error('Precise slew failed!')
+            sys.exit(-1)
             continue
 
     if not result:
         logging.error('Could not autofocus sucessfully')
+    else:
+        logging.info('Autofocus sucessful!')
+
 
     # return to original position
     logging.info(f'Returning to original position {cur_radec.to_string("hmsdms", sep=":")}')
@@ -428,7 +372,10 @@ if __name__ == '__main__':
 
         sys.exit(1)
 
-    logging.info('Autofocus and return to original position suceeded!')
-    sys.exit(0)
+    logging.info('Return to original position suceeded!')
+    if not result:
+        sys.exit(-1)
+    else:
+        sys.exit(0)
 
 

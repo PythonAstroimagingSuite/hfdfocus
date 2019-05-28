@@ -231,12 +231,13 @@ if __name__ == '__main__':
         logging.info(f'focuser = {focuser}')
         if not focuser:
             logging.error(f'Unabled to connect to focuser driver {focuser_driver}')
-
+            sys.exit(-1)
         logging.info(f'Connecting to camera driver {camera_driver}')
         cam = sdi.connect_camera(camera_driver)
         logging.info(f'cam = {cam}')
         if not cam:
             logging.error(f'Unabled to connect to camera driver {camera_driver}')
+            sys.exit(-1)
     else:
         simul_star = C8_F7_Star_Simulator()
 
