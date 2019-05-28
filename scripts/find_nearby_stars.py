@@ -5,6 +5,7 @@ import numpy as np
 import argparse
 import logging
 
+from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
 
@@ -36,14 +37,13 @@ if __name__ == '__main__':
     parser.add_argument('--outfile', type=str, help='Output file with candidates')
     parser.add_argument('--force', action='store_true', help='Overwrite output file')
     parser.add_argument('--lst', type=str, help='Local sidereal time')
-    parser.add_argument('--onlypierside', type=str, help='EAST or WEST side only')
+    parser.add_argument('--onlyside', type=str, help='EAST or WEST side only')
     parser.add_argument('--meridianthres', type=str, default='00:30:00',
                         help='How close to meridian is allowed (hh:mm:ss)')
-    parser.add_argument('--lat', type=float, help='Location latitude')
     parser.add_argument('--lon', type=float, help='Location longitude')
-    parser.add_argument('--tz', type=str, help='Location tz')
-    parser.add_argument('--allowflip', action='store_true', help='Allow meridian flip to find star')
-
+#    parser.add_argument('--lat', type=float, help='Location latitude')
+#    parser.add_argument('--tz', type=str, help='Location tz')
+#    parser.add_argument('--allowflip', action='store_true', help='Allow meridian flip to find star')
 
     args = parser.parse_args()
 
@@ -59,11 +59,20 @@ if __name__ == '__main__':
                 logging.debug(f'Removing existing output file {args.outfile}')
                 os.unlink(args.outfile)
 
+    # arguments for controlling filtering by which side of meridian are a
+    # bit convoluted and conflict
+    #
+    # to sort it out for now only allow
+    #
+    # --lst --onlyside
+    #
+    # OR
+    #
+    # --lon --onlyside
+    #
     local_sidtime = None
-    if args.onlypierside:
-        if args.onlypierside not in ['EAST', 'WEST']:
-            logging.error('--onlypierside must specify EAST or WEST only')
-            sys.exit(1)
+    force_side = None
+    if args.lst:
         lst_ok = False
         if args.lst is not None:
             try:
@@ -74,7 +83,7 @@ if __name__ == '__main__':
             lst_ok = True
 
         if not lst_ok:
-            logging.error('Cannot apply pier side filtering with a supplied LST')
+            logging.error('Cannot apply pier side filtering with the supplied LST')
             sys.exit(1)
 
         try:
@@ -82,10 +91,37 @@ if __name__ == '__main__':
         except ValueError:
             logging.error("Invalid meridan threshold")
             sys.exit(1)
+    else:
+        # should have lat/lon/tz
+        obs_lon = None
 
-        logging.info(f'Using pier side constraint of {args.onlypierside} ' \
-                         f'and LST = {local_sidtime}')
-        logging.info(f'Using meridian threshold of {meridian_thres.to_string(unit=u.hour)}')
+        if args.lon is not None:
+            obs_lon = args.lon
+
+        if obs_lon is not None:
+            # compute local sidereal time and current pier side
+            now = Time.now()
+            local_sidtime = now.sidereal_time('apparent', obs_lon*u.degree)
+            time_fmt = '%H:%M:%S'
+            logging.info(f'Local sidereal time is {local_sidtime.hms}')
+
+    # if a sid time is given then get rest of args
+    if local_sidtime is not None:
+        try:
+            meridian_thres = Angle(args.meridianthres, unit=u.hour)
+        except ValueError:
+            logging.error("Invalid meridan threshold")
+            sys.exit(1)
+
+        # figure out side requested position is on
+        if args.onlyside not in ['EAST', 'WEST']:
+            logging.error('--onlyside must specify EAST or WEST only')
+            sys.exit(1)
+        force_side = args.onlyside
+
+    logging.info(f'Using pier side constraint of {force_side} ' \
+                     f'and LST = {local_sidtime.hms}')
+    logging.info(f'Using meridian threshold of {meridian_thres.to_string(unit=u.hour)}')
 
     saocat = load_SAOCatalog_binary(args.cat)
     logging.info(f'Loaded {len(saocat.id)} stars')
@@ -181,16 +217,16 @@ if __name__ == '__main__':
                 logging.info(f'Excluding star SAO{saocat.id[cat_idx]} due " \
                              f"to neighbor within {exclusion_rad} degrees.')
 
-        elif args.onlypierside is not None:
+        elif force_side is not None:
             # filter out if on wrong side of pier from where scope is pointing
             hour_angle = (local_sidtime - radec.ra).wrap_at('180d')
             logging.info(f'SAO{saocat.id[cat_idx]} {radec.ra} {local_sidtime} {hour_angle.degree} {meridian_thres.degree}')
             # negative hour angle means the object is EAST of the meridian
 
-            if (hour_angle.degree < meridian_thres.degree and args.onlypierside == 'WEST'):
+            if (hour_angle.degree < meridian_thres.degree and force_side == 'WEST'):
                 logging.info('Too far EAST for WEST contraint')
                 star_ok = False
-            if (hour_angle.degree > -meridian_thres.degree and args.onlypierside == 'EAST'):
+            if (hour_angle.degree > -meridian_thres.degree and force_side == 'EAST'):
                 logging.info('Too far WEST for EAST contraint')
                 star_ok = False
 

@@ -172,7 +172,7 @@ if __name__ == '__main__':
 
     if not rc:
         logging.error('slew failed')
-        sys.exit(-1)
+        sys.exit(1)
 
     while True:
         isslew = tel.is_slewing()

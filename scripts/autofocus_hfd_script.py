@@ -32,6 +32,11 @@ from hfdfocus.StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 # for simulator
 from hfdfocus.c8_simul_star import C8_F7_Star_Simulator
 
+FOCUSER_MIN_POS = None
+FOCUSER_MAX_POS = None
+FOCUSER_DIR = None
+
+
 def measure_frame(starimage_data):
     # analyze frame
     bg = 800
@@ -99,8 +104,8 @@ def take_exposure_and_measure_star(imgname, focus_expos):
     return measure_frame(starimage_data)
 
 def move_focuser(pos):
-    if pos > args.focus_max or pos < args.focus_min:
-        logging.error(f'Requested focus position {pos} is outside allowed range {args.focus_min} to {args.focus_max}!!!')
+    if pos > FOCUSER_MAX_POS or pos < FOCUSER_MIN_POS:
+        logging.error(f'Requested focus position {pos} is outside allowed range {FOCUSER_MIN_POS} to {FOCUSER_MAX_POS}!!!')
         sys.exit(1)
 
     if not focuser.move_absolute_position(pos):
@@ -164,9 +169,9 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
 
 def parse_commandline():
     parser = argparse.ArgumentParser()
-    parser.add_argument('focus_min', type=int, help='Lowest focus travel allowed')
-    parser.add_argument('focus_max', type=int, help='Highest focus travel allowed')
-    parser.add_argument('focus_dir', type=str, help='IN or OUT')
+    parser.add_argument('--focus_min', type=int, help='Lowest focus travel allowed')
+    parser.add_argument('--focus_max', type=int, help='Highest focus travel allowed')
+    parser.add_argument('--focus_dir', type=str, help='IN or OUT')
     parser.add_argument('--focus_start', type=int, help='Starting focus pos')
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
     parser.add_argument('--debugplotsdelay', type=float, default=1, help='Delay (seconds) showing each plot')
@@ -190,9 +195,9 @@ def parse_commandline():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='sample_vcurve.log',
+    logging.basicConfig(filename='autofocus_hfd_script.log',
                         filemode='w',
-                        level=logging.INFO,
+                        level=logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -200,7 +205,7 @@ if __name__ == '__main__':
     log = logging.getLogger()
     formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
@@ -209,17 +214,31 @@ if __name__ == '__main__':
 
     # connect focuser and camera
     if not args.simul:
-
         # load profile
         if args.profile is not None:
             logging.info(f'Using equipment profile {args.profile}')
             equip_profile = EquipmentProfile('astroprofiles/equipment', args.profile)
+            logging.debug(f'profile = {equip_profile._config}')
             equip_profile.read()
             camera_driver = equip_profile.camera_driver
             focuser_driver = equip_profile.focuser_driver
+            FOCUSER_MIN_POS = equip_profile.get('focuser_min_pos', None)
+            FOCUSER_MAX_POS = equip_profile.get('focuser_max_pos', None)
+            FOCUSER_DIR = equip_profile.get('focuser_pref_dir', None)
         else:
             focuser_driver = args.focuser
             camera_driver = args.camera
+            FOCUSER_MIN_POS = args.focus_min
+            FOCUSER_MAX_POS = args.focus_max
+            FOCUSER_DIR = args.focus_dir
+
+        # since we're on real hardware need a min/max pos
+        if FOCUSER_MIN_POS is None or FOCUSER_MAX_POS is None:
+            logging.error('Must specify a min and max allowed pos for focuser!')
+            sys.exit(1)
+        if FOCUSER_DIR is None:
+            logging.error('Must specify the preferred focus direction!')
+            sys.exit(1)
 
         sdi = SDI()
 
@@ -240,6 +259,14 @@ if __name__ == '__main__':
             sys.exit(-1)
     else:
         simul_star = C8_F7_Star_Simulator()
+
+        if args.focus_dir is not None:
+            FOCUSER_DIR = args.focus_dir
+        else:
+            logging.info('--simul mode choosing focus dir of IN since none specified')
+            FOCUSER_DIR = 'IN'
+
+    logging.info(f'Using focus min/max/dir of {FOCUSER_MIN_POS} {FOCUSER_MAX_POS} {FOCUSER_DIR}')
 
     # create output dir
     datestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())
@@ -281,16 +308,16 @@ if __name__ == '__main__':
     else:
         fpos_1 = args.focus_start
 
-    if args.focus_dir == 'OUT':
+    if FOCUSER_DIR == 'OUT':
         fdir = 1
         vslope = vcurve_ls
         vpid = vcurve_lp
-    elif args.focus_dir == 'IN':
+    elif FOCUSER_DIR == 'IN':
         fdir = -1
         vslope = vcurve_rs
         vpid = vcurve_rp
     else:
-        logging.error(f'Unknown focus directin {args.focus_dir} - exitting!')
+        logging.error(f'Unknown focus direction {FOCUSER_DIR} - exitting!')
         sys.exit(1)
 
     ntries = 0
@@ -411,8 +438,9 @@ if __name__ == '__main__':
 
     logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_inner} {int(avg_inner_hfd/vslope)} {vpid}')
 
-    if fpos_best > args.focus_max or fpos_best < args.focus_min:
-        logging.error(f'Best focus position {fpos_best} is outside allowed range {args.focus_min} to {args.focus_max}')
+    # when using the internal 'focus simulator' we don't impose a min/max position limit
+    if not args.simul and (fpos_best > FOCUSER_MAX_POS or fpos_best < FOCUSER_MIN_POS):
+        logging.error(f'Best focus position {fpos_best} is outside allowed range {FOCUSER_MIN_POS} to {FOCUSER_MAX_POS}')
     else:
         best_hfd = measure_at_focus_pos(fpos_best, focus_expos)
 

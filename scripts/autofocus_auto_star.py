@@ -140,8 +140,12 @@ def run_findstars(curpos, args):
     mag = float(args.mag)
     cmd_line += f'--minmag {mag+0.5} '
     cmd_line += f'--maxmag {mag-0.5} '
-    cmd_line += f'--lst {args.lst} '
-    cmd_line += f'--onlypierside {args.onlypierside}'
+    if args.lst is not None:
+        cmd_line += f'--lst {args.lst} '
+    if args.lon is not None:
+        cmd_line += f'--lon {args.lon} '
+    if args.onlyside is not None:
+        cmd_line += f'--onlyside {args.onlyside} '
     if args.meridianthres is not None:
         cmd_line += f' --meridianthres {args.meridianthres}'
 
@@ -252,8 +256,8 @@ def run_autofocus(args, extra_args):
     cmd_line = PYTHON_EXE_PATH + ' '
     cmd_line += 'autofocus_hfd_script.py '
     #FIXME defaults for C8
-    cmd_line += f'{args.focusmin} {args.focusmax} '
-    cmd_line += f'{args.focusdir} '
+#    cmd_line += f'{args.focusmin} {args.focusmax} '
+#    cmd_line += f'{args.focusdir} '
     if dev_args.debugplots:
         cmd_line += '--debugplots '
     if dev_args.simul:
@@ -299,14 +303,15 @@ if __name__ == '__main__':
     log.addHandler(ch)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('focusmin', type=int, help='Min allowed focuser pos')
-    parser.add_argument('focusmax', type=int, help='Max allowed focuser pos')
-    parser.add_argument('focusdir', type=str, help='Focus IN or OUT')
+#    parser.add_argument('focusmin', type=int, help='Min allowed focuser pos')
+#    parser.add_argument('focusmax', type=int, help='Max allowed focuser pos')
+#    parser.add_argument('focusdir', type=str, help='Focus IN or OUT')
     parser.add_argument('dist', type=float, help='Max distance in degrees')
     parser.add_argument('mag', type=float, help='Desired mag focus star')
-    parser.add_argument('lst', type=str, help='Local sidereal time')
-    parser.add_argument('onlypierside', type=str, help='EAST or WEST side only')
     parser.add_argument('pixelscale', type=float, help='Pixel scale for plate solving')
+    parser.add_argument('--lst', type=str, help='Local sidereal time')
+    parser.add_argument('--onlyside', type=str, help='EAST or WEST side only')
+    parser.add_argument('--lon', type=float, help='Location longitude')
     parser.add_argument('--meridianthres', type=str, default='00:30:00',
                         help='How close to meridian is allowed (hh:mm:ss)')
     parser.add_argument('--maxtries', type=int, default=3,
@@ -346,7 +351,7 @@ if __name__ == '__main__':
                     logging.error(f'Autofocus failed - trying next candidate (try {ntries} of {args.maxtries}!')
                 else:
                     logging.error(f'Autofocus failed - tried max {args.maxtgies} already - quitting!')
-                    sys.exit(-1)
+                    sys.exit(1)
                 continue
             else:
                 logging.info(f'Autofocus suceeded - result = {focus_result}')
@@ -354,7 +359,7 @@ if __name__ == '__main__':
                 break
         else:
             logging.error('Precise slew failed!')
-            sys.exit(-1)
+            sys.exit(1)
             continue
 
     if not result:
@@ -371,10 +376,11 @@ if __name__ == '__main__':
         logging.error('Failed to return to original position!')
 
         sys.exit(1)
+    else:
+        logging.info('Return to original position suceeded!')
 
-    logging.info('Return to original position suceeded!')
     if not result:
-        sys.exit(-1)
+        sys.exit(1)
     else:
         sys.exit(0)
 
