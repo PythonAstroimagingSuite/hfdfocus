@@ -7,14 +7,16 @@ import logging
 import astropy.io.fits as pyfits
 
 import numpy as np
-from scipy.stats import siegelslopes
+#from scipy.stats import siegelslopes
 
 import matplotlib as mpl
 mpl.rc('font', size=8)
 import matplotlib.pyplot as plt
 
 from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
-from pyastroprofile.EquipmentProfile import EquipmentProfile
+from pyastroprofile.AstroProfile import AstroProfile
+
+#from pyastroprofile.EquipmentProfile import EquipmentProfile
 
 #ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
 
@@ -216,15 +218,16 @@ if __name__ == '__main__':
     if not args.simul:
         # load profile
         if args.profile is not None:
-            logging.info(f'Using equipment profile {args.profile}')
-            equip_profile = EquipmentProfile('astroprofiles/equipment', args.profile)
-            logging.debug(f'profile = {equip_profile._config}')
-            equip_profile.read()
-            camera_driver = equip_profile.camera_driver
-            focuser_driver = equip_profile.focuser_driver
-            FOCUSER_MIN_POS = equip_profile.get('focuser_min_pos', None)
-            FOCUSER_MAX_POS = equip_profile.get('focuser_max_pos', None)
-            FOCUSER_DIR = equip_profile.get('focuser_pref_dir', None)
+            logging.info(f'Using astro profile {args.profile}')
+            ap = AstroProfile()
+            ap.read(args.profile)
+            logging.debug(f'profile = {ap.equipment}')
+            camera_driver = ap.equipment.camera.driver
+            print(dir(ap.equipment.focuser))
+            focuser_driver = ap.equipment.focuser.get('driver')
+            FOCUSER_MIN_POS = ap.equipment.focuser.get('minpos', None)
+            FOCUSER_MAX_POS = ap.equipment.focuser.get('maxpos', None)
+            FOCUSER_DIR = ap.settings.autofocus.get('focus_dir', None)
         else:
             focuser_driver = args.focuser
             camera_driver = args.camera

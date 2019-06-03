@@ -11,7 +11,8 @@ import shlex
 import argparse
 import logging
 import subprocess
-import numpy as np
+
+from pyastroprofile.AstroProfile import AstroProfile
 
 # FIXME this should be handled automaticall!
 
@@ -74,13 +75,14 @@ def run_program(cmd_line, label='', trimlog=True):
     return rc, output
 
 
-def run_platesolve(pixelscale):
+def run_platesolve():
     # parse out device info
     # FIXME seems alot of duplication need a better way to represent
     # device info like a config file
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--profile', type=str, help='Name of equipment profile')
+    parser.add_argument('--profile', type=str, help='Name of astro profile')
+    parser.add_argument('--pixelscale', type=float, help='Pixel scale for plate solving')
     dev_args, unknown = parser.parse_known_args(sys.argv)
 
     logging.debug(f'run_platesolve: dev_args, unknown = {dev_args} {unknown}')
@@ -89,7 +91,8 @@ def run_platesolve(pixelscale):
     cmd_line = PYTHON_EXE_PATH + ' '
     cmd_line += '../../pyastrometry/scripts/pyastrometry_cli_main.py solvepos '
     cmd_line += f'--outfile {result_fname} '
-    cmd_line += f'--pixelscale {pixelscale} '
+    if dev_args.pixelscale is not None:
+        cmd_line += f'--pixelscale {dev_args.pixelscale} '
     if dev_args.profile is not None:
         cmd_line += f'--profile {dev_args.profile}'
 
@@ -125,7 +128,7 @@ def run_platesolve(pixelscale):
     logging.info(f'radec = {radec.to_string()}')
     return radec
 
-def run_findstars(curpos, args):
+def run_findstars(curpos, args, lon=None):
     result_fname = './autofocus_auto_starlist.dat'
     cmd_line = PYTHON_EXE_PATH + ' '
     #cmd_line = 'python '
@@ -144,6 +147,8 @@ def run_findstars(curpos, args):
         cmd_line += f'--lst {args.lst} '
     if args.lon is not None:
         cmd_line += f'--lon {args.lon} '
+    elif lon is not None:
+        cmd_line += f'--lon {lon} '
     if args.onlyside is not None:
         cmd_line += f'--onlyside {args.onlyside} '
     if args.meridianthres is not None:
@@ -201,12 +206,13 @@ def run_precise_slew(target, args, extra_args):
     # device info like a config file
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--profile', type=str, help='Name of equipment profile')
-    parser.add_argument('--telescope', type=str, help='Name of telescope driver')
+    parser.add_argument('--profile', type=str, help='Name of astro profile')
+    parser.add_argument('--mount', type=str, help='Name of mount driver')
     parser.add_argument('--camera', type=str, help='Name of camera driver')
     parser.add_argument('--exposure', type=float, default=5, help='Exposure time')
     parser.add_argument('--binning', type=int, default=2, help='Camera binning')
-    parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
+    parser.add_argument('--pixelscale', type=float, help='Pixel scale (arcsec/pixel)')
+#    parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     dev_args, unknown = parser.parse_known_args(sys.argv)
 
     logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
@@ -217,17 +223,18 @@ def run_precise_slew(target, args, extra_args):
     cmd_line += rastr + ' '
     decstr = target.dec.to_string(alwayssign=True, sep=":", pad=True)
     cmd_line += f'" {decstr}" '
-    cmd_line += f'--pixelscale {args.pixelscale} '
-    if dev_args.framesize is not None:
-        cmd_line += f'--framesize {dev_args.framesize} '
+    if dev_args.pixelscale:
+        cmd_line += f'--pixelscale {dev_args.pixelscale} '
+#    if dev_args.framesize is not None:
+#        cmd_line += f'--framesize {dev_args.framesize} '
 
-    # use json to handle double quotes in camera and telescope
+    # use json to handle double quotes in camera and mount
     # arguments which might be passed as something like "CCD Simulator"
     # and the shlex.split() will split them
     if dev_args.camera is not None:
         cmd_line += f'--camera {json.dumps(dev_args.camera)} '
-    if dev_args.telescope is not None:
-        cmd_line += f'--telescope {json.dumps(dev_args.telescope)} '
+    if dev_args.mount is not None:
+        cmd_line += f'--mount {json.dumps(dev_args.mount)} '
     cmd_line += f'--exposure {dev_args.exposure} '
     cmd_line += f'--binning {dev_args.binning} '
     if dev_args.profile is not None:
@@ -264,7 +271,7 @@ def run_autofocus(args, extra_args):
         cmd_line += '--simul '
     if dev_args.framesize:
         cmd_line += f'--framesize {dev_args.framesize} '
-    # use json to handle double quotes in camera and telescope
+    # use json to handle double quotes in camera and mount
     # arguments which might be passed as something like "CCD Simulator"
     # and the shlex.split() will split them
     if dev_args.camera is not None:
@@ -308,7 +315,7 @@ if __name__ == '__main__':
 #    parser.add_argument('focusdir', type=str, help='Focus IN or OUT')
     parser.add_argument('dist', type=float, help='Max distance in degrees')
     parser.add_argument('mag', type=float, help='Desired mag focus star')
-    parser.add_argument('pixelscale', type=float, help='Pixel scale for plate solving')
+    parser.add_argument('--profile', type=str, help='Name of astro profile')
     parser.add_argument('--lst', type=str, help='Local sidereal time')
     parser.add_argument('--onlyside', type=str, help='EAST or WEST side only')
     parser.add_argument('--lon', type=float, help='Location longitude')
@@ -322,11 +329,22 @@ if __name__ == '__main__':
     logging.info(f'args = {args}')
     logging.info(f'extra_args = {extra_args}')
 
-    cur_radec = run_platesolve(args.pixelscale)
+    # get astro profile if specified
+    if args.profile is not None:
+        logging.info(f'Using astro profile {args.profile}')
+        ap = AstroProfile()
+        ap.read(args.profile)
+        lon = ap.observatory.location.get('longitude', None)
+
+    cur_radec = run_platesolve()
+
+    if cur_radec is None:
+        logging.error('Initial plate solve failed!')
+        sys.exit(1)
 
     logging.info(f'Original location is {cur_radec.to_string("hmsdms", sep=":")}')
 
-    star_list = run_findstars(cur_radec, args)
+    star_list = run_findstars(cur_radec, args, lon=lon)
 
     logging.info(f'Star list = {star_list}')
 
