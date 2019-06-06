@@ -89,7 +89,10 @@ def run_platesolve():
 
     result_fname = './autofocus_auto_origpos.json'
     cmd_line = PYTHON_EXE_PATH + ' '
-    cmd_line += '../../pyastrometry/scripts/pyastrometry_cli_main.py solvepos '
+    script = 'pyastrometry_cli_main.py'
+    if PYASTROMETRY_SCRIPT_PATH is not None:
+        script = os.path.join(PYASTROMETRY_SCRIPT_PATH, script)
+    cmd_line += f'{script} solvepos '
     cmd_line += f'--outfile {result_fname} '
     if dev_args.pixelscale is not None:
         cmd_line += f'--pixelscale {dev_args.pixelscale} '
@@ -131,9 +134,13 @@ def run_platesolve():
 def run_findstars(curpos, args, lon=None):
     result_fname = './autofocus_auto_starlist.dat'
     cmd_line = PYTHON_EXE_PATH + ' '
-    #cmd_line = 'python '
+    if AUTOFOCUS_SCRIPT_PATH is not None:
+        cmd_line += f'{AUTOFOCUS_SCRIPT_PATH}/'
     cmd_line += 'find_nearby_stars.py '
-    cmd_line += '../data/SAO_Catalog_m5_p11_filtered.bin '
+    if AUTOFOCUS_DATA_PATH is not None:
+        cmd_line += f'{AUTOFOCUS_DATA_PATH}/'
+    #cmd_line += '../data/SAO_Catalog_m5_p11_filtered.bin '
+    cmd_line += 'SAO_Catalog_m5_p11_filtered.bin '
     rastr = curpos.ra.to_string(u.hour, sep=":", pad=True)
     cmd_line += rastr + ' '
     decstr = curpos.dec.to_string(alwayssign=True, sep=":", pad=True)
@@ -218,7 +225,10 @@ def run_precise_slew(target, args, extra_args):
     logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
 
     cmd_line = PYTHON_EXE_PATH + ' '
-    cmd_line += '../../pyastrometry/scripts/pyastrometry_cli_main.py slewsolve '
+    script = 'pyastrometry_cli_main.py'
+    if PYASTROMETRY_SCRIPT_PATH is not None:
+        script = os.path.join(PYASTROMETRY_SCRIPT_PATH, script)
+    cmd_line += f'{script} slewsolve '
     rastr = target.ra.to_string(u.hour, sep=":", pad=True)
     cmd_line += rastr + ' '
     decstr = target.dec.to_string(alwayssign=True, sep=":", pad=True)
@@ -255,12 +265,15 @@ def run_autofocus(args, extra_args):
     parser.add_argument('--focuser', type=str,  help='Focuser Driver')
     parser.add_argument('--camera', type=str, help='Name of camera driver')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
+    parser.add_argument('--simuldatadir', type=str,  help='Location of simulated star data')
     parser.add_argument('--debugplots', action='store_true', help='Show plots')
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     dev_args, unknown = parser.parse_known_args(sys.argv)
     logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
 
     cmd_line = PYTHON_EXE_PATH + ' '
+    if AUTOFOCUS_SCRIPT_PATH is not None:
+        cmd_line += f'{AUTOFOCUS_SCRIPT_PATH}/'
     cmd_line += 'autofocus_hfd_script.py '
     #FIXME defaults for C8
 #    cmd_line += f'{args.focusmin} {args.focusmax} '
@@ -269,6 +282,8 @@ def run_autofocus(args, extra_args):
         cmd_line += '--debugplots '
     if dev_args.simul:
         cmd_line += '--simul '
+        if dev_args.simuldatadir is not None:
+            cmd_line += f'--simuldatadir {dev_args.simuldatadir} '
     if dev_args.framesize:
         cmd_line += f'--framesize {dev_args.framesize} '
     # use json to handle double quotes in camera and mount
@@ -281,11 +296,14 @@ def run_autofocus(args, extra_args):
     if dev_args.profile is not None:
         cmd_line += f'--profile {dev_args.profile}'
 
+    logging.debug(f'run_autofocus cmd_line = {cmd_line}')
+
     rc, output = run_program(cmd_line, label='autofocus')
 
     logging.debug(f'autofocus rc = {rc}')
     if rc != 0:
         logging.error(f'run_autofocus: return code was {rc}!')
+        sys.exit(1)
         return None
 
     return True
@@ -323,11 +341,32 @@ if __name__ == '__main__':
                         help='How close to meridian is allowed (hh:mm:ss)')
     parser.add_argument('--maxtries', type=int, default=3,
                         help='Number of stars to try before giving up')
+    parser.add_argument('--usedebugpaths', action='store_true', help='Run auxilary programs from checked out sources')
 
     args, extra_args = parser.parse_known_args()
 
     logging.info(f'args = {args}')
     logging.info(f'extra_args = {extra_args}')
+
+    # FIXME setup DEBUG paths if we're running all from git
+    if args.usedebugpaths:
+        # find paths to other modules
+        from importlib.util import find_spec
+        s = find_spec('hfdfocus')
+        head, rest = os.path.split(s.origin)
+        AUTOFOCUS_SCRIPT_PATH = os.path.normpath(head + '/../scripts')
+        AUTOFOCUS_DATA_PATH = os.path.normpath(head + '/../data')
+        s = find_spec('pyastrometry')
+        head, rest = os.path.split(s.origin)
+        PYASTROMETRY_SCRIPT_PATH = os.path.normpath(head + '/../scripts')
+    else:
+        AUTOFOCUS_SCRIPT_PATH = None
+        AUTOFOCUS_DATA_PATH = None
+        PYASTROMETRY_SCRIPT_PATH = None
+
+    logging.info(f'AUTOFOCUS_SCRIPT_PATH = {AUTOFOCUS_SCRIPT_PATH}')
+    logging.info(f'AUTOFOCUS_DATA_PATH = {AUTOFOCUS_DATA_PATH}')
+    logging.info(f'PYASTROMETRY_SCRIPT_PATH = {PYASTROMETRY_SCRIPT_PATH}')
 
     # get astro profile if specified
     if args.profile is not None:

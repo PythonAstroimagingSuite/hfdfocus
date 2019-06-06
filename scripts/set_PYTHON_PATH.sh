@@ -1,1 +1,1 @@
-export PYTHONPATH="..:../../pyastroprofile:../../pyastrobackend:../../pyastrometry"
+export PYTHONPATH="..:../../pyastroprofile:../../pyastrobackend:../../pyastrometry:../../hfdfocus"

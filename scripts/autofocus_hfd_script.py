@@ -191,6 +191,7 @@ def parse_commandline():
     parser.add_argument('--winsize', default=250, type=int,  help='Size of window used to analyze star')
     parser.add_argument('--focusdelay', default=0.5, type=float,  help='Delay (seconds) after focus moves')
     parser.add_argument('--numaverage', default=5, type=int,  help='Number of images to average')
+    parser.add_argument('--simuldatadir', type=str,  help='Location of simulated star data')
 
     args = parser.parse_args()
     return args
@@ -261,7 +262,13 @@ if __name__ == '__main__':
             logging.error(f'Unabled to connect to camera driver {camera_driver}')
             sys.exit(-1)
     else:
-        simul_star = C8_F7_Star_Simulator()
+        if args.simuldatadir is not None:
+            starfile = os.path.join(args.simuldatadir, 'C8_Simul_Defocus_Star.fit')
+            bgfile = os.path.join(args.simuldatadir, 'C8_Simul_BG.fit')
+            simul_star = C8_F7_Star_Simulator(starimage_name=starfile,
+                                              bgimage_name=bgfile)
+        else:
+            simul_star = C8_F7_Star_Simulator()
 
         if args.focus_dir is not None:
             FOCUSER_DIR = args.focus_dir
