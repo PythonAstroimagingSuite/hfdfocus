@@ -39,6 +39,16 @@ import matplotlib.pyplot as plt
 # using lots of window x window samples compute median
 #
 def compute_bg_model(image, window):
+    """
+    Compute a model of the background of an image by using a grid of sample
+    boxes each (window x window) pixels and replacing pixels within with the
+    median value of the box.
+
+    :param image: Numpy 2D array image data.
+    :param window: Size of sampling window in pixels.
+
+    :return: Image containing background model.
+    """
     ht, wd = image.shape
 
     bgmodel = np.empty_like(image)
@@ -58,19 +68,49 @@ def compute_bg_model(image, window):
 
 # assumes gray data
 def compute_noise_level(data):
+    """
+    Compute the median absolute deviation (MAD) of image data.
+
+    :param data: Numpy 2D array image data.
+    :return: MAD of image data.
+    :rtype: float
+    """
     mad = np.median(np.abs(data - np.median(data)))
     return mad
 
 def compute_median(data):
+    """
+    Compute the median of image data.
+
+    :param data: Numpy 2D array image data.
+    :return: Median of image data.
+    :rtype: float
+    """
     return np.median(data)
 
 # from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/
 def raw_moment(data, i_order, j_order):
+    """
+    Compute the raw image and central moments.
+    Based on from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/.
+
+    :param data: Numpy 2D array image data.
+    :param i_order, j_order: Indices of moment matrix to compute
+    :return: Request moment.
+    :rtype: float
+    """
     nrows, ncols = data.shape
     y_indices, x_indicies = np.mgrid[:nrows, :ncols]
     return (data * x_indicies**i_order * y_indices**j_order).sum()
 
 def moments_cov(data):
+    """
+    Compute the second order central moments and covariance matrix.
+    Based on from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/.
+
+    :param data: Numpy 2D array image data.
+    :return: Covariance matrix.
+    """
     data_sum = data.sum()
     m10 = raw_moment(data, 1, 0)
     m01 = raw_moment(data, 0, 1)
@@ -83,6 +123,14 @@ def moments_cov(data):
     return cov
 
 def get_major_minor_axes(data):
+    """
+    Compute the vector for major and minor axes.
+    Based on from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/.
+
+    :param data: Numpy 2D array image data.
+    :returns: Tuple of two tuples, each containing the X, Y components of vector and its norm.
+    :rtype: ((float, float, float), (float, float, float))
+    """
     cov = moments_cov(data)
     evals, evecs = np.linalg.eig(cov)
 
@@ -103,7 +151,14 @@ def get_major_minor_axes(data):
 # end of moment code
 
 def find_centroid(image_data, thres):
+    """
+    Compute centroid of image data.
 
+    :param image_data: Numpy 2D array image data.
+    :param thres: Ignore pixels less than this value, also subtracted before calculation.
+    :returns: Tuple of centroid X, Y values.
+    :rtype: (float, float)
+    """
     image_data = image_data - thres
     image_data[image_data < 0] = 0
 
@@ -123,6 +178,29 @@ def find_centroid(image_data, thres):
 
 def find_star(image_data, bgfact=50, satur=50000, window=100,
               starmodel=False, bgmodel=False, debugfits=False):
+    """
+    Find the brightest star in given image data.  All pixels less than bgfact*MAD over
+    the background are ignored.  A region of (window x window) pixels is used to
+    search of stars.  If this value is too small then large defocused stars will be
+    missed.
+
+    :param image_data: Numpy 2D image data.
+    :param bgfact:  Used to set threshold for rejecting background pixels.
+    :param satur: Any pixel over this value is considered saturated.
+    :param window: Size of square window used for calculating potential star parameters.
+    :param starmodel: Whether a model of star pixels is used - usually disabled.
+    :param bgmodel: Whether a model of background is computed or just median used.
+    :param debugfits: If True then FITS files of various stages of computation are output.
+    :returns:
+        Tuple containing:
+            - centroid X
+            - centroid Y
+            - background level
+            - background MAD
+            - image mask for box used to compute star data
+            - flag indicating whether the star was alone or not
+    :rtype: (float, float, float, float, numpy 2D array, bool)
+    """
     logging.debug(f'find_stars start: bgfact={bgfact} window={window}')
 
     if debugfits:
@@ -306,6 +384,13 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
 # horizontal bin data to form a 1D star profile
 # compute radial profile - returns (rad[], val[])
 def horiz_bin_window(data, bg=0):
+    """
+    Bin image data in 1D.
+
+    :param data: Numpy 2D image data.
+    :param bg: Background value to subtract from data before binning.
+    :return: 1D numpy profile.
+    """
     #ts = time.time()
 
     ni, nj = data.shape
@@ -319,7 +404,15 @@ def horiz_bin_window(data, bg=0):
 
 # find left/right limits of star disk
 def find_star_limits_robust(profile, thres=0):
+    """
+    Given a 1D star profile search to right and left of peak for edges of profile.
 
+    :param profile: 1D star profile (numpy array)
+    :param thres: Ignore all pixels below this value.
+    :returns:
+        Tuple containing index for left and right extremes of star profile.
+    :rtype: (int, int)
+    """
     # search from left side (idx=0) for first pixel over thres
     #idx = np.where(profile > thres)[0]
 
@@ -366,7 +459,15 @@ def find_star_limits(profile, thres=0):
 
 # find HFD from 1D profile
 def find_hfd_from_1D(profile, thres=0, debugplots=False):
+    """
+    Given a 1D star profile compute Half Flux Diameter (HFD).
 
+    :param profile: 1D star profile (numpy array)
+    :param thres: Ignore all pixels below this value.
+    :param debugplots: If True then matplotlib plots of progress will be generated.
+    :return: HFD of star profile in pixels.
+    :rtype: (float)
+    """
     # compute flux within values lx and rx in profile.
     # proffunc should be an scipy interp1d object representing
     # the 1D profile of the star which has been background
@@ -493,6 +594,32 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r, totflux)
 
 def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
+    """
+    Given image data find brightest star and compute HFD.
+
+    :param image_data: Numpy 2D image data.
+    :param thres:  Binned pixels less than this value ignored in profile computation.
+    :param win: Size of window used to compute star data.
+    :param debugplots: If True then matplotlib plots of progress will be generated.
+    :param debugfits: If True then FITS files of various stages of computation are output.
+    :returns:
+        Tuple containing:
+            - index of star center of star profile
+            - index of left extent of star profile
+            - index of right extent of star profile
+            - interpolated 'half flux' boundary to left of park
+            - interpolated 'half flux' boundary to right of park
+            - total flux in star profile
+            - flag indicating whether the star was alone or not.
+    :rtype: (int, int, int, float, float, float, bool)
+
+    """
+
+#        Tuple containing , left and right limits, left and right
+#        "half flux" limits, total flux in star profile, and a flag of whether the
+#        star was alone or not.
+
+
     xcen, ycen, bg, noise, starmask, alone = find_star(image_data, debugfits=debugfits)
 
     img_ht, img_wd = image_data.shape

@@ -26,18 +26,18 @@ import matplotlib.pyplot as plt
 import scipy.ndimage as ndimage
 from hfdfocus.StarFitHFD import find_brightest_star_HFD
 
-def parse_commandline():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('focus_cen', type=int, help='Focus position for best focus')
-    parser.add_argument('focus_pos', type=int, help='Current focus position')
-    parser.add_argument('focus_slope', type=float, help='V curve slope')
-    parser.add_argument('focus_pid', type=float, help='V curve PID')
-
-    #    parser.add_argument('--debuggraphs', action='store_true', help="Display debug graphs")
-
-    return parser.parse_args()
 
 def shrink_star(starimage_data, bgimage_data, reduction):
+    """
+    Given a 2D image shrink by the reduction factor and pad the outer areas
+    with the median of the image data.
+
+    :param starimage_data: 2D numpy image data to be reduced.
+    :param bgimage_data: 2D numpy image data for a background region to be sampled.
+    :param reduction: Scaling factor (0-1).
+    :return: Scaled down image:
+    """
+
     ht, wd = starimage_data.shape
 #    shrunk_star_data = tf.resize(starimage_data,
 #                                    [int(ht*reduction), int(wd*reduction)],
@@ -66,6 +66,16 @@ def shrink_star(starimage_data, bgimage_data, reduction):
 
 
 class C8_F7_Star_Simulator:
+    """
+    Simulates the defocused star from a Celestron C8 8 inch f/10 SCT reduced
+    to f/7.  Uses actual image data and scales down the image depending on the
+    focus position requested.
+
+    :param starimage_name: Name of FITS image data for defocused star.
+    :param bgimage_name: Name of FITS image containing background only.
+    :param companion_offset: Optional offset (x, y) in pixels for another simulated star.
+    :param companion_ratio: Ratio (0-1) of brightness of companion.
+    """
     def __init__(self, starimage_name='../data/C8_Simul_Defocus_Star.fit',
                  bgimage_name='../data/C8_Simul_BG.fit',
                  companion_offset=None, companion_flux_ratio=1.0):
@@ -92,10 +102,22 @@ class C8_F7_Star_Simulator:
 
     # measured best focus position from sampled V curve
     def get_best_focus_pos(self):
+        """
+        Returns the focus position for simulated model of smallest star size.
+
+        :returns: Focus position of smallest star size.
+        """
         return 7983
 
     # based on data measured 2019/05/13 on C8 @ f/7
     def simul_hfd_size(self, focus_pos, focus_cen):
+        """
+        Compute HFD size at focus position based on a model.
+
+        :param focus_pos: Focus position for computation.
+        :param focus_cen: Focus position of best focus.
+        :return: HFD at requested focus position.
+        """
         # load this on demand
         if self.ref_hfd is None:
             # measure star size
@@ -117,6 +139,13 @@ class C8_F7_Star_Simulator:
     # a current focuser position return a scaled image of
     # a defocused star based on sampled V curve data
     def get_simul_star_image(self, focus_pos, focus_cen=None):
+        """
+        Return simulated star image for requested focus position.
+
+        :param focus_pos: Focus position for computation.
+        :param focus_cen: Focus position of best focus.
+        :return: 2D simulated star image.
+        """
         if focus_cen is None:
             focus_cen = self.get_best_focus_pos()
         hfd = self.simul_hfd_size(focus_pos, focus_cen)
@@ -136,6 +165,17 @@ class C8_F7_Star_Simulator:
 
         return shrunk_image
 
+
+def parse_commandline():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('focus_cen', type=int, help='Focus position for best focus')
+    parser.add_argument('focus_pos', type=int, help='Current focus position')
+    parser.add_argument('focus_slope', type=float, help='V curve slope')
+    parser.add_argument('focus_pid', type=float, help='V curve PID')
+
+    #    parser.add_argument('--debuggraphs', action='store_true', help="Display debug graphs")
+
+    return parser.parse_args()
 
 if __name__ == '__main__':
     logging.basicConfig(filename='c8_simul_star.log',

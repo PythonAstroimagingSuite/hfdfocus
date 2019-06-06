@@ -20,10 +20,10 @@ ASCOM_FOCUS_DRIVER = 'ASCOM.Simulator.Focuser'
 #from pyastrobackend.SimpleDeviceInterface import take_exposure
 #from pyastrobackend.SimpleDeviceInterface import wait_on_focuser_move
 
-from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
+from hfdfocus.StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 
 # for simulator
-from c8_simul_star import C8_F7_Star_Simulator
+from hfdfocus.c8_simul_star import C8_F7_Star_Simulator
 
 def parse_commandline():
     parser = argparse.ArgumentParser()

@@ -1,0 +1,16 @@
+Project tracking 2019/05/27
+
+
+hfdfocus
+
+   autofocus_auto_star.py
+
+  FIXED   * need to figure out best way to run python interpretter on WIN/LINUX
+             -> use sys.executable to locate current interpretter
+  FIXED   * figure out how to handle Popen on WIN/LINUX
+             -> split args for Linux, send cmd line as single string on WIN
+
+
+   autofocus_hfd_star.py
+
+  FIXED   * make framesize = 1000 (or largest possible less than 1000)

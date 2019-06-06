@@ -1,23 +1,7 @@
-import sys
 import logging
 from struct import pack, unpack, calcsize
 
 import numpy as np
-#from astropy import units as u
-#from astropy.coordinates import SkyCoord
-#from astropy.coordinates import FK5
-#from astropy.coordinates import Angle
-
-#def write_SAOCatalog_binary(obj, fname):
-#    f = open(fname, 'wb')
-#    pickle.dump(obj, f)
-#    f.close()
-#
-#def load_SAOCatalog_binary(fname):
-#    f = open(fname, 'rb')
-#    obj = pickle.load(f)
-#    f.close()
-#    return obj
 
 #
 # Binary format (preliminary!)
@@ -33,6 +17,14 @@ import numpy as np
 # Vmag      (nrec*float32)
 #
 def write_SAOCatalog_binary(saocat, fname):
+    """
+    Write binary version of :class:`SAOCatalog` object to a file.
+
+    :param saocat: :class:`SAOCatalog` object to write to file.
+    :param fname: Filename of output file.
+    :return: True on success.
+    :rtype: bool
+    """
     f = open(fname, 'wb')
 
     # make sure all lists the same length!
@@ -46,7 +38,7 @@ def write_SAOCatalog_binary(saocat, fname):
     # then all elem are the same
     if nelem.count(nelem[0]) != len(nelem):
         logging.error('write_SAOCatalog_binary(): Error - not all lists the same length!')
-        return None
+        return False
 
     nrec = nelem[0]
     f.write(pack('I', nrec))
@@ -60,8 +52,16 @@ def write_SAOCatalog_binary(saocat, fname):
     f.write(pack(f'{nrec}f', *saocat.vmag))
     f.close()
 
+    return True
 
 def load_SAOCatalog_binary(fname):
+    """
+    Load binary version of :class:`SAOCatalog` object from a file.
+
+    :param fname: Filename of catalog file.
+    :return: :class:`SAOCatalog` on success or None otherwise.
+    :rtype: bool:class:`SAOCatalog`
+    """
 
     def unpack_next(f, fmt):
         #print(fmt)
@@ -105,6 +105,10 @@ def load_SAOCatalog_binary(fname):
         return saocat
 
 class SAOCatalog:
+    """
+    Class representing stars fromt the SAO Catalog.
+
+    """
     def __init__(self):
         self.id = []
         self.epoch = 2000.0
@@ -116,7 +120,20 @@ class SAOCatalog:
         self.mindec = None
 
     def find_stars_near_target(self, target, dist, minmag, maxmag, exclude=None):
+        """
+        Find stars near an RA/DEC position in the sky with constraints.
 
+        :param target: RA/DEC position
+        :type: SkyCoord
+        :param dist: Maximum distance for star in degrees.
+        :param minmag: Minimum (faintest) magnitude for star.
+        :param maxmag: Maximum (brightest) magnitude for star.
+        :param exclude: Stars to be excluded (reference by position in lists).
+
+        :returns:
+            Tuple containing list of indices of matching stars and list of distances.
+        :rtype: (list, list)
+        """
         t_ra_rad = target.ra.radian
         t_dec_rad = target.dec.radian
 

@@ -1,0 +1,979 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>hfdfocus.StarFitHFD &mdash; hfdfocus 0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> hfdfocus
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../autofocus_hfd_script.html">Using autofocus_hfd_script.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../autofocus_auto_star.html">Using autofocus_auto_star.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../working_with_vcurves.html">Using V Curves</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">hfdfocus</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>hfdfocus.StarFitHFD</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for hfdfocus.StarFitHFD</h1><div class="highlight"><pre>
+<span></span><span class="c1">#</span>
+<span class="c1"># star fitting routines</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright 2019 Michael Fulbright</span>
+<span class="c1">#</span>
+<span class="c1">#</span>
+<span class="c1">#    This program is free software: you can redistribute it and/or modify</span>
+<span class="c1">#    it under the terms of the GNU General Public License as published by</span>
+<span class="c1">#    the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1">#    (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1">#    This program is distributed in the hope that it will be useful,</span>
+<span class="c1">#    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="c1">#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</span>
+<span class="c1">#    GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1">#    You should have received a copy of the GNU General Public License</span>
+<span class="c1">#    along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">ndimage</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="k">import</span> <span class="n">interp1d</span>
+<span class="kn">from</span> <span class="nn">scipy.integrate</span> <span class="k">import</span> <span class="n">romb</span>
+
+<span class="c1">#import skimage.measure as skmeasure</span>
+
+<span class="kn">import</span> <span class="nn">astropy.io.fits</span> <span class="k">as</span> <span class="nn">pyfits</span>
+
+<span class="c1"># for testing</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+
+
+<span class="c1">#</span>
+<span class="c1"># using lots of window x window samples compute median</span>
+<span class="c1">#</span>
+<div class="viewcode-block" id="compute_bg_model"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.compute_bg_model">[docs]</a><span class="k">def</span> <span class="nf">compute_bg_model</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">window</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute a model of the background of an image by using a grid of sample</span>
+<span class="sd">    boxes each (window x window) pixels and replacing pixels within with the</span>
+<span class="sd">    median value of the box.</span>
+
+<span class="sd">    :param image: Numpy 2D array image data.</span>
+<span class="sd">    :param window: Size of sampling window in pixels.</span>
+
+<span class="sd">    :return: Image containing background model.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ht</span><span class="p">,</span> <span class="n">wd</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="n">bgmodel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ht</span><span class="p">,</span> <span class="n">window</span><span class="p">):</span>
+        <span class="n">yl</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="n">ym</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">ht</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">yl</span><span class="o">+</span><span class="n">window</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">wd</span><span class="p">,</span> <span class="n">window</span><span class="p">):</span>
+            <span class="n">xl</span> <span class="o">=</span> <span class="n">x</span>
+            <span class="n">xm</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">wd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">xl</span><span class="o">+</span><span class="n">window</span><span class="p">)</span>
+
+<span class="c1">#            print(f&#39;sample range y={yl}:{ym}  x={xl}:{xm} median=&#39;, np.median(image[yl:ym, xl:xm]))</span>
+
+            <span class="n">bgmodel</span><span class="p">[</span><span class="n">yl</span><span class="p">:</span><span class="n">ym</span><span class="p">,</span> <span class="n">xl</span><span class="p">:</span><span class="n">xm</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">image</span><span class="p">[</span><span class="n">yl</span><span class="p">:</span><span class="n">ym</span><span class="p">,</span> <span class="n">xl</span><span class="p">:</span><span class="n">xm</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">bgmodel</span></div>
+
+<span class="c1"># assumes gray data</span>
+<div class="viewcode-block" id="compute_noise_level"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.compute_noise_level">[docs]</a><span class="k">def</span> <span class="nf">compute_noise_level</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the median absolute deviation (MAD) of image data.</span>
+
+<span class="sd">    :param data: Numpy 2D array image data.</span>
+<span class="sd">    :return: MAD of image data.</span>
+<span class="sd">    :rtype: float</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">data</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">mad</span></div>
+
+<div class="viewcode-block" id="compute_median"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.compute_median">[docs]</a><span class="k">def</span> <span class="nf">compute_median</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the median of image data.</span>
+
+<span class="sd">    :param data: Numpy 2D array image data.</span>
+<span class="sd">    :return: Median of image data.</span>
+<span class="sd">    :rtype: float</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+
+<span class="c1"># from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/</span>
+<div class="viewcode-block" id="raw_moment"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.raw_moment">[docs]</a><span class="k">def</span> <span class="nf">raw_moment</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">i_order</span><span class="p">,</span> <span class="n">j_order</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the raw image and central moments.</span>
+<span class="sd">    Based on from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/.</span>
+
+<span class="sd">    :param data: Numpy 2D array image data.</span>
+<span class="sd">    :param i_order, j_order: Indices of moment matrix to compute</span>
+<span class="sd">    :return: Request moment.</span>
+<span class="sd">    :rtype: float</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">nrows</span><span class="p">,</span> <span class="n">ncols</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">y_indices</span><span class="p">,</span> <span class="n">x_indicies</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[:</span><span class="n">nrows</span><span class="p">,</span> <span class="p">:</span><span class="n">ncols</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">data</span> <span class="o">*</span> <span class="n">x_indicies</span><span class="o">**</span><span class="n">i_order</span> <span class="o">*</span> <span class="n">y_indices</span><span class="o">**</span><span class="n">j_order</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="moments_cov"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.moments_cov">[docs]</a><span class="k">def</span> <span class="nf">moments_cov</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the second order central moments and covariance matrix.</span>
+<span class="sd">    Based on from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/.</span>
+
+<span class="sd">    :param data: Numpy 2D array image data.</span>
+<span class="sd">    :return: Covariance matrix.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data_sum</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">m10</span> <span class="o">=</span> <span class="n">raw_moment</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">m01</span> <span class="o">=</span> <span class="n">raw_moment</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">x_centroid</span> <span class="o">=</span> <span class="n">m10</span> <span class="o">/</span> <span class="n">data_sum</span>
+    <span class="n">y_centroid</span> <span class="o">=</span> <span class="n">m01</span> <span class="o">/</span> <span class="n">data_sum</span>
+    <span class="n">u11</span> <span class="o">=</span> <span class="p">(</span><span class="n">raw_moment</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">x_centroid</span> <span class="o">*</span> <span class="n">m01</span><span class="p">)</span> <span class="o">/</span> <span class="n">data_sum</span>
+    <span class="n">u20</span> <span class="o">=</span> <span class="p">(</span><span class="n">raw_moment</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="n">x_centroid</span> <span class="o">*</span> <span class="n">m10</span><span class="p">)</span> <span class="o">/</span> <span class="n">data_sum</span>
+    <span class="n">u02</span> <span class="o">=</span> <span class="p">(</span><span class="n">raw_moment</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="n">y_centroid</span> <span class="o">*</span> <span class="n">m01</span><span class="p">)</span> <span class="o">/</span> <span class="n">data_sum</span>
+    <span class="n">cov</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">u20</span><span class="p">,</span> <span class="n">u11</span><span class="p">],</span> <span class="p">[</span><span class="n">u11</span><span class="p">,</span> <span class="n">u02</span><span class="p">]])</span>
+    <span class="k">return</span> <span class="n">cov</span></div>
+
+<div class="viewcode-block" id="get_major_minor_axes"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.get_major_minor_axes">[docs]</a><span class="k">def</span> <span class="nf">get_major_minor_axes</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the vector for major and minor axes.</span>
+<span class="sd">    Based on from https://alyssaq.github.io/2015/computing-the-axes-or-orientation-of-a-blob/.</span>
+
+<span class="sd">    :param data: Numpy 2D array image data.</span>
+<span class="sd">    :returns: Tuple of two tuples, each containing the X, Y components of vector and its norm.</span>
+<span class="sd">    :rtype: ((float, float, float), (float, float, float))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cov</span> <span class="o">=</span> <span class="n">moments_cov</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">evals</span><span class="p">,</span> <span class="n">evecs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eig</span><span class="p">(</span><span class="n">cov</span><span class="p">)</span>
+
+    <span class="n">sort_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">evals</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">x_v1</span><span class="p">,</span> <span class="n">y_v1</span> <span class="o">=</span> <span class="n">evecs</span><span class="p">[:,</span> <span class="n">sort_indices</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>  <span class="c1"># Eigenvector with largest eigenvalue</span>
+    <span class="n">x_v2</span><span class="p">,</span> <span class="n">y_v2</span> <span class="o">=</span> <span class="n">evecs</span><span class="p">[:,</span> <span class="n">sort_indices</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+
+    <span class="n">n_v1</span> <span class="o">=</span> <span class="n">evals</span><span class="p">[</span><span class="n">sort_indices</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">n_v2</span> <span class="o">=</span> <span class="n">evals</span><span class="p">[</span><span class="n">sort_indices</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+<span class="c1">#    print(evals)</span>
+<span class="c1">#    print(evals[sort_indices])</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Major axis = </span><span class="si">{x_v1}</span><span class="s1">, </span><span class="si">{y_v1}</span><span class="s1">, </span><span class="si">{n_v1}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Minor axis = </span><span class="si">{x_v2}</span><span class="s1">, </span><span class="si">{y_v2}</span><span class="s1">, </span><span class="si">{n_v2}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">((</span><span class="n">x_v1</span><span class="p">,</span> <span class="n">y_v1</span><span class="p">,</span> <span class="n">n_v1</span><span class="p">),</span> <span class="p">(</span><span class="n">x_v2</span><span class="p">,</span> <span class="n">y_v2</span><span class="p">,</span> <span class="n">n_v2</span><span class="p">))</span></div>
+
+
+<span class="c1"># end of moment code</span>
+
+<div class="viewcode-block" id="find_centroid"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.find_centroid">[docs]</a><span class="k">def</span> <span class="nf">find_centroid</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span> <span class="n">thres</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute centroid of image data.</span>
+
+<span class="sd">    :param image_data: Numpy 2D array image data.</span>
+<span class="sd">    :param thres: Ignore pixels less than this value, also subtracted before calculation.</span>
+<span class="sd">    :returns: Tuple of centroid X, Y values.</span>
+<span class="sd">    :rtype: (float, float)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">image_data</span> <span class="o">=</span> <span class="n">image_data</span> <span class="o">-</span> <span class="n">thres</span>
+    <span class="n">image_data</span><span class="p">[</span><span class="n">image_data</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">total</span> <span class="o">=</span> <span class="p">(</span><span class="n">image_data</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">iidx</span><span class="p">,</span> <span class="n">jidx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="n">image_data</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+    <span class="n">iidx</span> <span class="o">=</span> <span class="n">iidx</span> <span class="o">+</span> <span class="mf">0.5</span>
+    <span class="n">jidx</span> <span class="o">=</span> <span class="n">jidx</span> <span class="o">+</span> <span class="mf">0.5</span>
+
+    <span class="n">wsum_i</span> <span class="o">=</span><span class="p">(</span><span class="n">iidx</span><span class="o">*</span><span class="p">(</span><span class="n">image_data</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">wsum_j</span> <span class="o">=</span> <span class="p">(</span><span class="n">jidx</span><span class="o">*</span><span class="p">(</span><span class="n">image_data</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="n">ci</span> <span class="o">=</span> <span class="n">wsum_i</span><span class="o">/</span><span class="n">total</span>
+    <span class="n">cj</span> <span class="o">=</span> <span class="n">wsum_j</span><span class="o">/</span><span class="n">total</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">ci</span><span class="p">,</span> <span class="n">cj</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="find_star"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.find_star">[docs]</a><span class="k">def</span> <span class="nf">find_star</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span> <span class="n">bgfact</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">satur</span><span class="o">=</span><span class="mi">50000</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+              <span class="n">starmodel</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">bgmodel</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">debugfits</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Find the brightest star in given image data.  All pixels less than bgfact*MAD over</span>
+<span class="sd">    the background are ignored.  A region of (window x window) pixels is used to</span>
+<span class="sd">    search of stars.  If this value is too small then large defocused stars will be</span>
+<span class="sd">    missed.</span>
+
+<span class="sd">    :param image_data: Numpy 2D image data.</span>
+<span class="sd">    :param bgfact:  Used to set threshold for rejecting background pixels.</span>
+<span class="sd">    :param satur: Any pixel over this value is considered saturated.</span>
+<span class="sd">    :param window: Size of square window used for calculating potential star parameters.</span>
+<span class="sd">    :param starmodel: Whether a model of star pixels is used - usually disabled.</span>
+<span class="sd">    :param bgmodel: Whether a model of background is computed or just median used.</span>
+<span class="sd">    :param debugfits: If True then FITS files of various stages of computation are output.</span>
+<span class="sd">    :returns:</span>
+<span class="sd">        Tuple containing:</span>
+<span class="sd">            - centroid X</span>
+<span class="sd">            - centroid Y</span>
+<span class="sd">            - background level</span>
+<span class="sd">            - background MAD</span>
+<span class="sd">            - image mask for box used to compute star data</span>
+<span class="sd">            - flag indicating whether the star was alone or not</span>
+<span class="sd">    :rtype: (float, float, float, float, numpy 2D array, bool)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;find_stars start: bgfact=</span><span class="si">{bgfact}</span><span class="s1"> window=</span><span class="si">{window}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">debugfits</span><span class="p">:</span>
+        <span class="n">pyfits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s1">&#39;thres_test.fits&#39;</span><span class="p">,</span> <span class="n">image_data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">),</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">ttot_s</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">bgmodel</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;compute_bg_model START&#39;</span><span class="p">)</span>
+        <span class="n">ts</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="n">bgmodel</span> <span class="o">=</span> <span class="n">compute_bg_model</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="n">te</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;compute_bg_model DONE took {te-ts} seconds&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">bg</span> <span class="o">=</span> <span class="n">compute_median</span><span class="p">(</span><span class="n">image_data</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;using constant bg model = </span><span class="si">{bg}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">bgmodel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">image_data</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">bg</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">debugfits</span><span class="p">:</span>
+        <span class="n">pyfits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s1">&#39;bgmodel_test.fits&#39;</span><span class="p">,</span> <span class="n">bgmodel</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">),</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># compute image with bg removed</span>
+    <span class="n">bgrem_data</span> <span class="o">=</span> <span class="n">image_data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span> <span class="o">-</span> <span class="n">bgmodel</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">debugfits</span><span class="p">:</span>
+        <span class="n">pyfits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s1">&#39;bgrem_test.fits&#39;</span><span class="p">,</span> <span class="n">bgrem_data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">),</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># find otsu threshold for each window</span>
+    <span class="n">ht</span><span class="p">,</span> <span class="n">wd</span> <span class="o">=</span> <span class="n">bgrem_data</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">bg_window</span> <span class="o">=</span> <span class="mi">100</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;computing star_model START&#39;</span><span class="p">)</span>
+    <span class="n">ts</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">star_model</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">bgrem_data</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">starmodel</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ht</span><span class="p">,</span> <span class="n">bg_window</span><span class="p">):</span>
+            <span class="n">yl</span> <span class="o">=</span> <span class="n">y</span>
+            <span class="n">ym</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">ht</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">yl</span><span class="o">+</span><span class="n">bg_window</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">wd</span><span class="p">,</span> <span class="n">bg_window</span><span class="p">):</span>
+                <span class="n">xl</span> <span class="o">=</span> <span class="n">x</span>
+                <span class="n">xm</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">wd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">xl</span><span class="o">+</span><span class="n">bg_window</span><span class="p">)</span>
+
+                <span class="n">data</span> <span class="o">=</span> <span class="n">bgrem_data</span><span class="p">[</span><span class="n">yl</span><span class="p">:</span><span class="n">ym</span><span class="p">,</span> <span class="n">xl</span><span class="p">:</span><span class="n">xm</span><span class="p">]</span>
+                <span class="n">data_med</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="n">data_mad</span> <span class="o">=</span> <span class="n">compute_noise_level</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+                <span class="n">thres</span> <span class="o">=</span> <span class="n">data_med</span> <span class="o">+</span> <span class="n">bgfact</span><span class="o">*</span><span class="n">data_mad</span>
+                <span class="n">star_model</span><span class="p">[</span><span class="n">yl</span><span class="p">:</span><span class="n">ym</span><span class="p">,</span> <span class="n">xl</span><span class="p">:</span><span class="n">xm</span><span class="p">]</span> <span class="o">=</span> <span class="n">bgrem_data</span><span class="p">[</span><span class="n">yl</span><span class="p">:</span><span class="n">ym</span><span class="p">,</span> <span class="n">xl</span><span class="p">:</span><span class="n">xm</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">thres</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">thres</span> <span class="o">=</span> <span class="n">compute_median</span><span class="p">(</span><span class="n">bgrem_data</span><span class="p">)</span> <span class="o">+</span> <span class="n">bgfact</span><span class="o">*</span><span class="n">compute_noise_level</span><span class="p">(</span><span class="n">bgrem_data</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using constant thres for star model = </span><span class="si">{thres}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">star_model</span> <span class="o">=</span> <span class="n">bgrem_data</span> <span class="o">&gt;</span> <span class="n">thres</span>
+
+    <span class="n">te</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;computing star_model DONE took {te-ts} seconds&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">debugfits</span><span class="p">:</span>
+        <span class="n">pyfits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;star_model_bgfact</span><span class="si">{bgfact}</span><span class="s1">.fits&#39;</span><span class="p">,</span> <span class="n">star_model</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">),</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># use dilation to stregthen any structures</span>
+    <span class="n">ndilate</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">tmp_image</span> <span class="o">=</span> <span class="n">star_model</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;dilating star_model </span><span class="si">{ndilate}</span><span class="s1"> times&#39;</span><span class="p">)</span>
+    <span class="n">ts</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ndilate</span><span class="p">):</span>
+        <span class="c1">#tmp_image = ndimage.grey_dilation(tmp_image, size=(3,3))</span>
+        <span class="n">tmp_image</span> <span class="o">=</span> <span class="n">ndimage</span><span class="o">.</span><span class="n">binary_dilation</span><span class="p">(</span><span class="n">tmp_image</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">)))</span>
+    <span class="n">te</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;computing dilation took {te-ts} seconds&#39;</span><span class="p">)</span>
+
+    <span class="n">dilate_star_model</span> <span class="o">=</span> <span class="n">tmp_image</span>
+    <span class="k">if</span> <span class="n">debugfits</span><span class="p">:</span>
+        <span class="n">pyfits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;dilate_tar_model_bgfact</span><span class="si">{bgfact}</span><span class="s1">.fits&#39;</span><span class="p">,</span> <span class="n">dilate_star_model</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">),</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># find structures</span>
+    <span class="n">star_label</span><span class="p">,</span> <span class="n">nstars</span> <span class="o">=</span> <span class="n">ndimage</span><span class="o">.</span><span class="n">measurements</span><span class="o">.</span><span class="n">label</span><span class="p">(</span><span class="n">dilate_star_model</span><span class="p">)</span>
+
+    <span class="c1">#print(star_label, nstars)</span>
+    <span class="k">if</span> <span class="n">debugfits</span><span class="p">:</span>
+        <span class="n">pyfits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;star_label.fits&#39;</span><span class="p">,</span> <span class="n">star_label</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">),</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Finding stars with &gt;= 9 pix START&#39;</span><span class="p">)</span>
+    <span class="n">star_boxes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">star_model</span><span class="p">)</span>
+    <span class="n">max_pix</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">max_l</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">ndimage</span><span class="o">.</span><span class="n">find_objects</span><span class="p">(</span><span class="n">star_label</span><span class="p">):</span>
+        <span class="c1">#print(f&#39;l={l}&#39;)</span>
+        <span class="n">npix</span> <span class="o">=</span> <span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="o">-</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="o">-</span><span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>
+        <span class="c1">#print(bgrem_data[l].shape, npix)</span>
+
+        <span class="k">if</span> <span class="n">npix</span> <span class="o">&lt;</span> <span class="mi">9</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;not enuf pix&#39;</span><span class="p">)</span>
+            <span class="k">continue</span>
+
+<span class="c1">#        if (bgrem_data[l] &gt; satur).sum() &gt; 0:</span>
+<span class="c1">#            print(&#39;bgrem too high&#39;)</span>
+<span class="c1">#            continue</span>
+
+        <span class="k">if</span> <span class="n">npix</span> <span class="o">&gt;</span> <span class="n">max_pix</span><span class="p">:</span>
+            <span class="n">max_pix</span> <span class="o">=</span> <span class="n">npix</span>
+            <span class="n">max_l</span> <span class="o">=</span> <span class="n">l</span>
+
+    <span class="k">if</span> <span class="n">max_l</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;find_star(): no object found&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="c1"># see if another object is within window centered on main object</span>
+    <span class="n">npix_max_l</span> <span class="o">=</span> <span class="p">(</span><span class="n">max_l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="o">-</span><span class="n">max_l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">max_l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="o">-</span><span class="n">max_l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>
+    <span class="n">alone</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;looking for nearby stars&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">ndimage</span><span class="o">.</span><span class="n">find_objects</span><span class="p">(</span><span class="n">star_label</span><span class="p">):</span>
+        <span class="n">npix</span> <span class="o">=</span> <span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="o">-</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="o">-</span><span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{max_l}</span><span class="s1">, </span><span class="si">{l}</span><span class="s1">, </span><span class="si">{npix_max_l}</span><span class="s1">, </span><span class="si">{npix}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span> <span class="o">==</span> <span class="n">max_l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span> <span class="ow">and</span> <span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span> <span class="o">==</span> <span class="n">max_l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span> <span class="ow">and</span> \
+           <span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span> <span class="o">==</span> <span class="n">max_l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span> <span class="ow">and</span> <span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span> <span class="o">==</span> <span class="n">max_l</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stop</span><span class="p">:</span>
+               <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;skipping is original label&#39;</span><span class="p">)</span>
+               <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">npix</span> <span class="o">&gt;</span> <span class="n">max_pix</span><span class="o">/</span><span class="mi">2</span><span class="p">:</span>
+            <span class="n">alone</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">break</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">alone</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;ERROR: find_star() Another star is nearby!&#39;</span><span class="p">)</span>
+
+    <span class="n">star_boxes</span><span class="p">[</span><span class="n">max_l</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">debugfits</span><span class="p">:</span>
+        <span class="n">pyfits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;star_boxes.fits&#39;</span><span class="p">,</span> <span class="n">star_boxes</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">),</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1">#    import skimage.morphology as skmorph</span>
+<span class="c1">#    pw = max_l[1].stop - max_l[1].start</span>
+<span class="c1">#    ph = max_l[0].stop - max_l[0].start</span>
+<span class="c1">#    logging.debug(f&#39;{max_l} {pw} {ph}&#39;)</span>
+<span class="c1">#</span>
+<span class="c1">#    perim_image = skmorph.flood_fill(dilate_star_model[max_l],</span>
+<span class="c1">#                                     seed_point=(int(pw/2), int(ph/2)),</span>
+<span class="c1">#                                     new_value=True)</span>
+<span class="c1">#    perim_image = skmorph.convex_hull_image(dilate_star_model[max_l])</span>
+<span class="c1">#</span>
+<span class="c1">#    perim = skmeasure.perimeter(perim_image)</span>
+<span class="c1">#    if debugfits:</span>
+<span class="c1">#        pyfits.writeto(f&#39;perim_image.fits&#39;, perim_image.astype(float), overwrite=True)</span>
+<span class="c1">#</span>
+    <span class="n">axes</span> <span class="o">=</span> <span class="n">get_major_minor_axes</span><span class="p">(</span><span class="n">dilate_star_model</span><span class="p">[</span><span class="n">max_l</span><span class="p">])</span>
+    <span class="n">majax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">minax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">ecc</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span><span class="o">-</span><span class="p">(</span><span class="n">minax</span><span class="o">/</span><span class="n">majax</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Major/Minor/Ecc = </span><span class="si">{majax}</span><span class="s1"> </span><span class="si">{minax}</span><span class="s1"> </span><span class="si">{ecc}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ecc</span> <span class="o">&gt;</span> <span class="mf">0.75</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;fERROR find_star(): Eccentricity </span><span class="si">{ecc}</span><span class="s1"> is outside acceptable range - probably not alone&#39;</span><span class="p">)</span>
+        <span class="n">alone</span> <span class="o">=</span> <span class="kc">False</span>
+
+
+    <span class="n">cy</span><span class="p">,</span> <span class="n">cx</span> <span class="o">=</span> <span class="n">ndimage</span><span class="o">.</span><span class="n">measurements</span><span class="o">.</span><span class="n">center_of_mass</span><span class="p">(</span><span class="n">star_boxes</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;COM cx, cy = </span><span class="si">{cx}</span><span class="s1">, </span><span class="si">{cy}</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="c1">#    logging.debug(f&#39;box={max_l}&#39;)</span>
+<span class="c1">#    logging.debug(f&#39;boxperim = {2*pw+2*ph} predperim={np.pi*(pw+ph)/2} actperim = {perim}&#39;)</span>
+
+    <span class="c1"># compute background near star</span>
+    <span class="c1">#</span>
+    <span class="n">yl</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">cy</span><span class="p">)</span><span class="o">-</span><span class="n">bg_window</span><span class="p">)</span>
+    <span class="n">ym</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">ht</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">yl</span><span class="o">+</span><span class="n">bg_window</span><span class="p">)</span>
+    <span class="n">xl</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">cx</span><span class="p">)</span><span class="o">-</span><span class="n">bg_window</span><span class="p">)</span>
+    <span class="n">xm</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">wd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">xl</span><span class="o">+</span><span class="n">bg_window</span><span class="p">)</span>
+    <span class="c1">#print(&#39;xl/xm/yl/xm=&#39;, xl, xm, yl, ym)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">bgmodel</span><span class="p">[</span><span class="n">yl</span><span class="p">:</span><span class="n">ym</span><span class="p">,</span> <span class="n">xl</span><span class="p">:</span><span class="n">xm</span><span class="p">]</span>
+    <span class="n">bglevel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">bgrem_data</span><span class="p">[</span><span class="n">yl</span><span class="p">:</span><span class="n">ym</span><span class="p">,</span> <span class="n">xl</span><span class="p">:</span><span class="n">xm</span><span class="p">]</span>
+    <span class="n">bgmad</span> <span class="o">=</span> <span class="n">compute_noise_level</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;bg = </span><span class="si">{bglevel}</span><span class="s1"> mad = </span><span class="si">{bgmad}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">ttot_e</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;find_star took {ttot_e-ttot_s} seconds&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">,</span> <span class="n">bglevel</span><span class="p">,</span> <span class="n">bgmad</span><span class="p">,</span> <span class="n">star_boxes</span><span class="p">,</span> <span class="n">alone</span></div>
+
+
+<span class="c1"># horizontal bin data to form a 1D star profile</span>
+<span class="c1"># compute radial profile - returns (rad[], val[])</span>
+<div class="viewcode-block" id="horiz_bin_window"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.horiz_bin_window">[docs]</a><span class="k">def</span> <span class="nf">horiz_bin_window</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">bg</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Bin image data in 1D.</span>
+
+<span class="sd">    :param data: Numpy 2D image data.</span>
+<span class="sd">    :param bg: Background value to subtract from data before binning.</span>
+<span class="sd">    :return: 1D numpy profile.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#ts = time.time()</span>
+
+    <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="n">profile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">data</span><span class="o">-</span><span class="n">bg</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="c1">#    print(data)</span>
+<span class="c1">#    print(profile)</span>
+
+    <span class="k">return</span> <span class="n">profile</span></div>
+
+<span class="c1"># find left/right limits of star disk</span>
+<div class="viewcode-block" id="find_star_limits_robust"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.find_star_limits_robust">[docs]</a><span class="k">def</span> <span class="nf">find_star_limits_robust</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">thres</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a 1D star profile search to right and left of peak for edges of profile.</span>
+
+<span class="sd">    :param profile: 1D star profile (numpy array)</span>
+<span class="sd">    :param thres: Ignore all pixels below this value.</span>
+<span class="sd">    :returns:</span>
+<span class="sd">        Tuple containing index for left and right extremes of star profile.</span>
+<span class="sd">    :rtype: (int, int)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># search from left side (idx=0) for first pixel over thres</span>
+    <span class="c1">#idx = np.where(profile &gt; thres)[0]</span>
+
+    <span class="n">left</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">right</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span><span class="o">-</span><span class="mi">2</span><span class="p">:</span>
+        <span class="c1">#print(&#39;l&#39;, idx, profile[idx], profile[idx+1], thres)</span>
+        <span class="k">if</span> <span class="n">profile</span><span class="p">[</span><span class="n">idx</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">thres</span> <span class="ow">and</span> <span class="n">profile</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">thres</span><span class="p">:</span>
+            <span class="n">left</span> <span class="o">=</span> <span class="n">idx</span>
+            <span class="k">break</span>
+        <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">left</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="n">idx</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span><span class="o">-</span><span class="mi">2</span>
+    <span class="k">while</span> <span class="n">idx</span> <span class="o">&gt;</span> <span class="n">left</span><span class="o">+</span><span class="mi">2</span><span class="p">:</span>
+        <span class="c1">#print(&#39;r&#39;, idx, profile[idx], profile[idx-1], thres)</span>
+        <span class="k">if</span> <span class="n">profile</span><span class="p">[</span><span class="n">idx</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">thres</span> <span class="ow">and</span> <span class="n">profile</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">thres</span><span class="p">:</span>
+            <span class="n">right</span> <span class="o">=</span> <span class="n">idx</span><span class="o">-</span><span class="mi">1</span>
+            <span class="k">break</span>
+        <span class="n">idx</span> <span class="o">-=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">left</span><span class="p">,</span> <span class="n">right</span></div>
+
+<span class="c1"># more robust find left/right limits of star disk</span>
+<div class="viewcode-block" id="find_star_limits"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.find_star_limits">[docs]</a><span class="k">def</span> <span class="nf">find_star_limits</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">thres</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+
+    <span class="c1"># start from left and find adjacent pixels where leftmost</span>
+    <span class="c1"># is less than thres and rightmost is greater than thres</span>
+
+    <span class="c1"># search from left side (idx=0) for first pixel over thres</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">profile</span> <span class="o">&gt;</span> <span class="n">thres</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="c1">#print(&#39;where -&gt; &#39;, idx)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="n">left</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+    <span class="n">right</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">left</span><span class="p">,</span> <span class="n">right</span></div>
+
+
+<span class="c1"># find HFD from 1D profile</span>
+<div class="viewcode-block" id="find_hfd_from_1D"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.find_hfd_from_1D">[docs]</a><span class="k">def</span> <span class="nf">find_hfd_from_1D</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">thres</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">debugplots</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given a 1D star profile compute Half Flux Diameter (HFD).</span>
+
+<span class="sd">    :param profile: 1D star profile (numpy array)</span>
+<span class="sd">    :param thres: Ignore all pixels below this value.</span>
+<span class="sd">    :param debugplots: If True then matplotlib plots of progress will be generated.</span>
+<span class="sd">    :return: HFD of star profile in pixels.</span>
+<span class="sd">    :rtype: (float)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># compute flux within values lx and rx in profile.</span>
+    <span class="c1"># proffunc should be an scipy interp1d object representing</span>
+    <span class="c1"># the 1D profile of the star which has been background</span>
+    <span class="c1"># subtracted</span>
+<span class="c1">#    def flux(proffunc, lx, rx):</span>
+<span class="c1">#        return quad(proffunc, lx, rx, epsabs=1, limit=100)[0]</span>
+
+    <span class="c1"># different way</span>
+    <span class="k">def</span> <span class="nf">flux2</span><span class="p">(</span><span class="n">proffunc</span><span class="p">,</span> <span class="n">rlo</span><span class="p">,</span> <span class="n">rhi</span><span class="p">):</span>
+        <span class="n">nr</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">7</span><span class="o">+</span><span class="mi">1</span>
+        <span class="n">rvals</span><span class="p">,</span> <span class="n">dr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">rlo</span><span class="p">,</span> <span class="n">rhi</span><span class="p">,</span> <span class="n">num</span><span class="o">=</span><span class="n">nr</span><span class="p">,</span> <span class="n">retstep</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">fvals</span> <span class="o">=</span> <span class="n">proffunc</span><span class="p">(</span><span class="n">rvals</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">romb</span><span class="p">(</span><span class="n">fvals</span><span class="p">,</span> <span class="n">dr</span><span class="p">)</span>
+
+    <span class="c1"># compute center of profile with weighted average</span>
+    <span class="n">plen</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1">#print(&#39;profile len = &#39;, plen)</span>
+
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">plen</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="c1">#print(idx)</span>
+
+    <span class="c1">#lidx, ridx = find_star_limits(profile, thres)</span>
+    <span class="n">lidx</span><span class="p">,</span> <span class="n">ridx</span> <span class="o">=</span> <span class="n">find_star_limits_robust</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">thres</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;left, right = </span><span class="si">{lidx}</span><span class="s1">, </span><span class="si">{ridx}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">lidx</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">ridx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">cidx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">idx</span><span class="p">[</span><span class="n">lidx</span><span class="p">:</span><span class="n">ridx</span><span class="p">]</span><span class="o">*</span><span class="n">profile</span><span class="p">[</span><span class="n">lidx</span><span class="p">:</span><span class="n">ridx</span><span class="p">])</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">profile</span><span class="p">[</span><span class="n">lidx</span><span class="p">:</span><span class="n">ridx</span><span class="p">])</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;center = </span><span class="si">{cidx}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="c1"># find left, right limits</span>
+    <span class="c1"># invert profile as y as a function of x on left and right</span>
+    <span class="c1"># sides of the profile</span>
+    <span class="n">lidx_low</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">lidx</span><span class="p">)</span>
+    <span class="n">lidx_hi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">lidx</span><span class="o">+</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">ridx_low</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ridx</span><span class="p">)</span>
+    <span class="n">ridx_hi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ridx</span><span class="o">+</span><span class="mi">2</span><span class="p">)</span>
+<span class="c1">#    print(lidx, lidx_low, lidx_hi, ridx, ridx_low, ridx_hi)</span>
+<span class="c1">#    print(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])</span>
+<span class="c1">#    print(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])</span>
+    <span class="n">lfunc</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">profile</span><span class="p">[</span><span class="n">lidx_low</span><span class="p">:</span><span class="n">lidx_hi</span><span class="p">],</span> <span class="n">idx</span><span class="p">[</span><span class="n">lidx_low</span><span class="p">:</span><span class="n">lidx_hi</span><span class="p">])</span>
+    <span class="n">rfunc</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">profile</span><span class="p">[</span><span class="n">ridx_low</span><span class="p">:</span><span class="n">ridx_hi</span><span class="p">],</span> <span class="n">idx</span><span class="p">[</span><span class="n">ridx_low</span><span class="p">:</span><span class="n">ridx_hi</span><span class="p">])</span>
+
+    <span class="n">lx</span> <span class="o">=</span> <span class="n">lfunc</span><span class="p">(</span><span class="n">thres</span><span class="p">)</span>
+    <span class="n">rx</span> <span class="o">=</span> <span class="n">rfunc</span><span class="p">(</span><span class="n">thres</span><span class="p">)</span>
+    <span class="n">proffunc</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">profile</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="n">ax_1</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">131</span><span class="p">)</span>
+        <span class="n">ax_2</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">132</span><span class="p">)</span>
+        <span class="n">ax_3</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">133</span><span class="p">)</span>
+        <span class="n">ax_1</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">profile</span><span class="p">[</span><span class="n">lidx_low</span><span class="p">:</span><span class="n">lidx_hi</span><span class="p">],</span> <span class="n">lfunc</span><span class="p">(</span><span class="n">profile</span><span class="p">[</span><span class="n">lidx_low</span><span class="p">:</span><span class="n">lidx_hi</span><span class="p">]))</span>
+        <span class="n">ax_1</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">lx</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;green&#39;</span><span class="p">)</span>
+        <span class="n">ax_2</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">profile</span><span class="p">[</span><span class="n">ridx_low</span><span class="p">:</span><span class="n">ridx_hi</span><span class="p">],</span> <span class="n">rfunc</span><span class="p">(</span><span class="n">profile</span><span class="p">[</span><span class="n">ridx_low</span><span class="p">:</span><span class="n">ridx_hi</span><span class="p">]))</span>
+        <span class="n">ax_2</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">rx</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;green&#39;</span><span class="p">)</span>
+
+<span class="c1">#    print(&#39;lx=&#39;, lx, thres, proffunc(lx))</span>
+<span class="c1">#    print(&#39;rx=&#39;, rx, thres, proffunc(rx))</span>
+
+    <span class="c1"># make sure inversion worked</span>
+    <span class="n">INVERSE_FRAC</span> <span class="o">=</span> <span class="mf">0.15</span>
+    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">thres</span><span class="o">-</span><span class="n">proffunc</span><span class="p">(</span><span class="n">lx</span><span class="p">))</span><span class="o">/</span><span class="n">thres</span> <span class="o">&gt;</span> <span class="n">INVERSE_FRAC</span> <span class="ow">or</span> <span class="nb">abs</span><span class="p">(</span><span class="n">thres</span><span class="o">-</span><span class="n">proffunc</span><span class="p">(</span><span class="n">rx</span><span class="p">))</span><span class="o">/</span><span class="n">thres</span> <span class="o">&gt;</span> <span class="n">INVERSE_FRAC</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;inversion failed!&#39;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;lx=</span><span class="si">{lx}</span><span class="s1"> thres=</span><span class="si">{thres}</span><span class="s1"> fit={proffunc(lx)}&#39;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;rx=</span><span class="si">{rx}</span><span class="s1"> thres=</span><span class="si">{thres}</span><span class="s1"> fit={proffunc(rx)}&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">debugplots</span><span class="p">:</span>
+            <span class="n">fig2</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+            <span class="n">ax_4</span> <span class="o">=</span> <span class="n">fig2</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+            <span class="n">ax_4</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">lidx_low</span><span class="p">,</span><span class="n">ridx_hi</span><span class="p">),</span> <span class="n">profile</span><span class="p">[</span><span class="n">lidx_low</span><span class="p">:</span><span class="n">ridx_hi</span><span class="p">])</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="c1"># now find flux inside left/right</span>
+    <span class="n">simple_totflux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">([</span><span class="n">profile</span><span class="p">[</span><span class="n">lidx</span><span class="p">:</span><span class="n">ridx</span><span class="p">]])</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;flux in star (simple) = </span><span class="si">{simple_totflux}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">totflux</span> <span class="o">=</span> <span class="n">flux2</span><span class="p">(</span><span class="n">proffunc</span><span class="p">,</span> <span class="n">lx</span><span class="p">,</span> <span class="n">rx</span><span class="p">)</span>
+    <span class="c1">#print(&#39;integrated flux in star = &#39;, flux(proffunc, lidx, ridx))</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;integrated flux in star = </span><span class="si">{totflux}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="c1"># compute flux as function of distance from center</span>
+    <span class="n">r_max</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">cidx</span><span class="o">-</span><span class="n">lx</span><span class="p">,</span> <span class="n">rx</span><span class="o">-</span><span class="n">cidx</span><span class="p">)</span>
+
+    <span class="n">r_arr</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1">#flux_vs_r = []</span>
+    <span class="n">flux2_vs_r</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">r_max</span><span class="p">)):</span>
+        <span class="n">r_arr</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+        <span class="n">rlo</span> <span class="o">=</span> <span class="n">cidx</span> <span class="o">-</span> <span class="n">r</span>
+        <span class="n">rhi</span> <span class="o">=</span> <span class="n">cidx</span> <span class="o">+</span> <span class="n">r</span>
+        <span class="c1">#flux_vs_r.append(flux(proffunc, rlo, rhi))</span>
+
+        <span class="c1"># different way</span>
+<span class="c1">#        nr = 2**7+1</span>
+<span class="c1">#        rvals, dr = np.linspace(rlo, rhi, num=nr, retstep=True)</span>
+<span class="c1">#        fvals = proffunc(rvals)</span>
+<span class="c1">#</span>
+<span class="c1">#        flux2_vs_r.append(romb(fvals, dr))</span>
+
+        <span class="n">flux2_vs_r</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">flux2</span><span class="p">(</span><span class="n">proffunc</span><span class="p">,</span> <span class="n">rlo</span><span class="p">,</span> <span class="n">rhi</span><span class="p">))</span>
+
+    <span class="c1">#print(f&#39;flux2_vs_r, r = {flux2_vs_r} {r_arr}&#39;)</span>
+
+    <span class="c1"># make inverse function of r vs flux to find half flux</span>
+    <span class="n">flux_inv</span> <span class="o">=</span> <span class="n">interp1d</span><span class="p">(</span><span class="n">flux2_vs_r</span><span class="p">,</span> <span class="n">r_arr</span><span class="p">)</span>
+
+    <span class="c1"># uncomment to see raw profile</span>
+    <span class="k">if</span> <span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">ax_3</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">r_arr</span><span class="p">,</span> <span class="n">flux2_vs_r</span><span class="p">)</span>
+    <span class="c1">#plt.show()</span>
+
+    <span class="n">half_flux_r</span> <span class="o">=</span> <span class="n">flux_inv</span><span class="p">(</span><span class="n">totflux</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;half flux rad = </span><span class="si">{half_flux_r}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="c1">#print(r_arr)</span>
+    <span class="c1">#print(flux_vs_r)</span>
+    <span class="c1">#print(flux2_vs_r)</span>
+    <span class="c1">#ax_3.plot(r_arr, flux_vs_r)</span>
+    <span class="k">if</span> <span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">ax_3</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">half_flux_r</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;green&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">cidx</span><span class="p">,</span> <span class="n">lx</span><span class="p">,</span> <span class="n">rx</span><span class="p">,</span> <span class="n">cidx</span><span class="o">-</span><span class="n">half_flux_r</span><span class="p">,</span> <span class="n">cidx</span><span class="o">+</span><span class="n">half_flux_r</span><span class="p">,</span> <span class="n">totflux</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="find_brightest_star_HFD"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.find_brightest_star_HFD">[docs]</a><span class="k">def</span> <span class="nf">find_brightest_star_HFD</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span> <span class="n">thres</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">win</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">debugplots</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">debugfits</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given image data find brightest star and compute HFD.</span>
+
+<span class="sd">    :param image_data: Numpy 2D image data.</span>
+<span class="sd">    :param thres:  Binned pixels less than this value ignored in profile computation.</span>
+<span class="sd">    :param win: Size of window used to compute star data.</span>
+<span class="sd">    :param debugplots: If True then matplotlib plots of progress will be generated.</span>
+<span class="sd">    :param debugfits: If True then FITS files of various stages of computation are output.</span>
+<span class="sd">    :returns:</span>
+<span class="sd">        Tuple containing:</span>
+<span class="sd">            - index of star center of star profile</span>
+<span class="sd">            - index of left extent of star profile</span>
+<span class="sd">            - index of right extent of star profile</span>
+<span class="sd">            - interpolated &#39;half flux&#39; boundary to left of park</span>
+<span class="sd">            - interpolated &#39;half flux&#39; boundary to right of park</span>
+<span class="sd">            - total flux in star profile</span>
+<span class="sd">            - flag indicating whether the star was alone or not.</span>
+<span class="sd">    :rtype: (int, int, int, float, float, float, bool)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<span class="c1">#        Tuple containing , left and right limits, left and right</span>
+<span class="c1">#        &quot;half flux&quot; limits, total flux in star profile, and a flag of whether the</span>
+<span class="c1">#        star was alone or not.</span>
+
+
+    <span class="n">xcen</span><span class="p">,</span> <span class="n">ycen</span><span class="p">,</span> <span class="n">bg</span><span class="p">,</span> <span class="n">noise</span><span class="p">,</span> <span class="n">starmask</span><span class="p">,</span> <span class="n">alone</span> <span class="o">=</span> <span class="n">find_star</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span> <span class="n">debugfits</span><span class="o">=</span><span class="n">debugfits</span><span class="p">)</span>
+
+    <span class="n">img_ht</span><span class="p">,</span> <span class="n">img_wd</span> <span class="o">=</span> <span class="n">image_data</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="n">xlow</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">xcen</span><span class="o">-</span><span class="n">win</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span>
+    <span class="n">xhi</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">img_wd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">xcen</span><span class="o">+</span><span class="n">win</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span>
+    <span class="n">ylow</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">ycen</span><span class="o">-</span><span class="n">win</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span>
+    <span class="n">yhi</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">img_ht</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">ycen</span><span class="o">+</span><span class="n">win</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span>
+    <span class="n">crop_data</span> <span class="o">=</span> <span class="n">image_data</span><span class="p">[</span><span class="n">ylow</span><span class="p">:</span><span class="n">yhi</span><span class="p">,</span> <span class="n">xlow</span><span class="p">:</span><span class="n">xhi</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="n">ax_2d</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">121</span><span class="p">)</span>
+        <span class="n">ax_1d</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">122</span><span class="p">)</span>
+        <span class="n">im</span> <span class="o">=</span> <span class="n">ax_2d</span><span class="o">.</span><span class="n">imshow</span><span class="p">((</span><span class="n">crop_data</span><span class="o">-</span><span class="n">bg</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax_2d</span><span class="p">)</span>
+
+    <span class="n">profile</span> <span class="o">=</span> <span class="n">horiz_bin_window</span><span class="p">(</span><span class="n">crop_data</span><span class="p">,</span> <span class="n">bg</span><span class="o">=</span><span class="n">bg</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;thres = </span><span class="si">{thres}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;profile = </span><span class="si">{profile}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">ax_1d</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span>
+
+    <span class="n">cidx</span><span class="p">,</span> <span class="n">lx</span><span class="p">,</span> <span class="n">rx</span><span class="p">,</span> <span class="n">lr</span><span class="p">,</span> <span class="n">rr</span><span class="p">,</span> <span class="n">totflux</span> <span class="o">=</span> <span class="n">find_hfd_from_1D</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">thres</span><span class="o">=</span><span class="n">thres</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">cidx</span><span class="p">,</span> <span class="n">lx</span><span class="p">,</span> <span class="n">rx</span><span class="p">,</span> <span class="n">lr</span><span class="p">,</span> <span class="n">rr</span><span class="p">,</span> <span class="n">totflux</span><span class="p">,</span> <span class="n">alone</span></div>
+
+<div class="viewcode-block" id="test_1d_with_gaussian"><a class="viewcode-back" href="../../hfdfocus.html#hfdfocus.StarFitHFD.test_1d_with_gaussian">[docs]</a><span class="k">def</span> <span class="nf">test_1d_with_gaussian</span><span class="p">():</span>
+
+    <span class="c1"># generate 2D gaussian sample star</span>
+    <span class="n">sigma_x</span> <span class="o">=</span> <span class="mi">10</span>
+    <span class="n">sigma_y</span> <span class="o">=</span> <span class="n">sigma_x</span>
+    <span class="n">size</span> <span class="o">=</span> <span class="mi">45</span>
+    <span class="n">peak</span> <span class="o">=</span> <span class="mi">200000</span><span class="o">/</span><span class="n">sigma_x</span><span class="o">/</span><span class="n">sigma_y</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+    <span class="n">bg</span> <span class="o">=</span> <span class="mi">800</span>
+    <span class="n">bgnoise</span> <span class="o">=</span> <span class="mi">50</span>
+    <span class="n">thres</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">size</span><span class="p">)</span><span class="o">*</span><span class="mi">5</span><span class="o">*</span><span class="n">bgnoise</span>
+
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="n">size</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">size</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="n">size</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">size</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
+
+    <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="c1">#z = (1/(2*np.pi*sigma_x*sigma_y) * np.exp(-(x**2/(2*sigma_x**2)</span>
+    <span class="c1">#     + y**2/(2*sigma_y**2))))</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="p">(</span><span class="n">peak</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="o">/</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">sigma_x</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+         <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="o">/</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">sigma_y</span><span class="o">**</span><span class="mi">2</span><span class="p">))))</span>
+    <span class="n">z</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">((</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">z</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">bg</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">bgnoise</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">z</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+    <span class="c1">#plt.contourf(x, y, z, cmap=&#39;Blues&#39;)</span>
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+    <span class="n">ax_2d</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">121</span><span class="p">)</span>
+    <span class="n">ax_1d</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">122</span><span class="p">)</span>
+    <span class="n">im</span> <span class="o">=</span> <span class="n">ax_2d</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">z</span><span class="o">-</span><span class="n">peak</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax_2d</span><span class="p">)</span>
+
+    <span class="n">profile</span> <span class="o">=</span> <span class="n">horiz_bin_window</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">bg</span><span class="o">=</span><span class="n">bg</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;thres = &#39;</span><span class="p">,</span> <span class="n">thres</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;profile = &#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">)</span>
+
+    <span class="n">scen</span><span class="p">,</span> <span class="n">sl</span><span class="p">,</span> <span class="n">sr</span> <span class="o">=</span> <span class="n">find_hfd_from_1D</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">thres</span><span class="o">=</span><span class="n">thres</span><span class="p">)</span>
+
+    <span class="n">ax_1d</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span>
+
+    <span class="n">ax_1d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">scen</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sl</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">sr</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ax_1d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">sl</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;green&#39;</span><span class="p">)</span>
+        <span class="n">ax_1d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">sr</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;green&#39;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;total counts = &#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">z</span><span class="o">-</span><span class="n">bg</span><span class="p">))</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s1">&#39;StarFitHFD.log&#39;</span><span class="p">,</span>
+                        <span class="n">filemode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">,</span>
+                        <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+                        <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> </span><span class="si">%(levelname)-8s</span><span class="s1"> </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">,</span>
+                        <span class="n">datefmt</span><span class="o">=</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1"> %H:%M:%S&#39;</span><span class="p">)</span>
+
+    <span class="c1"># add to screen as well</span>
+    <span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span>
+    <span class="n">formatter</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> </span><span class="si">%(levelname)-8s</span><span class="s1"> </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ch</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+    <span class="n">ch</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+    <span class="n">ch</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">ch</span><span class="p">)</span>
+
+    <span class="c1">#test_1d_with_gaussian()</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;infile&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Target&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--debugplots&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;show debug plots&#39;</span><span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+<span class="c1">#    logging.info(f&#39;command args = {args}&#39;)</span>
+
+    <span class="n">infile</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">infile</span>
+
+    <span class="n">hdu</span> <span class="o">=</span> <span class="n">pyfits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">infile</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">hdu</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">image_data</span> <span class="o">=</span> <span class="n">hdu</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">hdu</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="n">bg</span> <span class="o">=</span> <span class="mi">800</span>
+    <span class="n">thres</span> <span class="o">=</span> <span class="mi">10000</span>
+
+    <span class="n">xcen</span><span class="p">,</span> <span class="n">ycen</span> <span class="o">=</span> <span class="n">find_star</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span> <span class="n">debugfits</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">win</span> <span class="o">=</span> <span class="mi">100</span>
+    <span class="n">xlow</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">xcen</span><span class="o">-</span><span class="n">win</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">xhi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">xcen</span><span class="o">+</span><span class="n">win</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">ylow</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ycen</span><span class="o">-</span><span class="n">win</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">yhi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ycen</span><span class="o">+</span><span class="n">win</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">crop_data</span> <span class="o">=</span> <span class="n">image_data</span><span class="p">[</span><span class="n">ylow</span><span class="p">:</span><span class="n">yhi</span><span class="p">,</span> <span class="n">xlow</span><span class="p">:</span><span class="n">xhi</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="n">ax_2d</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">121</span><span class="p">)</span>
+        <span class="n">ax_1d</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">122</span><span class="p">)</span>
+        <span class="n">im</span> <span class="o">=</span> <span class="n">ax_2d</span><span class="o">.</span><span class="n">imshow</span><span class="p">((</span><span class="n">crop_data</span><span class="o">-</span><span class="n">bg</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax_2d</span><span class="p">)</span>
+
+    <span class="n">profile</span> <span class="o">=</span> <span class="n">horiz_bin_window</span><span class="p">(</span><span class="n">crop_data</span><span class="p">,</span> <span class="n">bg</span><span class="o">=</span><span class="n">bg</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;thres = &#39;</span><span class="p">,</span> <span class="n">thres</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;profile = &#39;</span><span class="p">,</span> <span class="n">profile</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">ax_1d</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span>
+
+    <span class="n">scen</span><span class="p">,</span> <span class="n">sl</span><span class="p">,</span> <span class="n">sr</span><span class="p">,</span> <span class="n">hfl</span><span class="p">,</span> <span class="n">hfr</span> <span class="o">=</span> <span class="n">find_hfr_from_1D</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">thres</span><span class="o">=</span><span class="n">thres</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">ax_1d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">scen</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sl</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">sr</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ax_1d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">sl</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;green&#39;</span><span class="p">)</span>
+            <span class="n">ax_1d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">sr</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;green&#39;</span><span class="p">)</span>
+            <span class="n">ax_1d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">hfl</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">)</span>
+            <span class="n">ax_1d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">hfr</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">)</span>
+            <span class="n">delta</span> <span class="o">=</span> <span class="n">sr</span><span class="o">-</span><span class="n">sl</span>
+            <span class="n">ax_1d</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="n">sl</span><span class="o">-</span><span class="n">delta</span><span class="o">/</span><span class="mi">4</span><span class="p">,</span> <span class="n">sr</span><span class="o">+</span><span class="n">delta</span><span class="o">/</span><span class="mi">4</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;total counts = &#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">crop_data</span><span class="o">-</span><span class="n">bg</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">debugplots</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;hfd.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span>
+    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{infile[26:30]}</span><span class="s1">, {hfr-hfl}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+
+
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Michael Fulbright
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
