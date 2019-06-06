@@ -12,6 +12,7 @@ Welcome to hfdfocus's documentation!
 
    autofocus_hfd_script
    autofocus_auto_star
+   find_nearby_stars
    working_with_vcurves
 
 
