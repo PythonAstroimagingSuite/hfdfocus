@@ -131,6 +131,60 @@ def run_platesolve():
     logging.info(f'radec = {radec.to_string()}')
     return radec
 
+def run_getpos():
+    # parse out device info
+    # FIXME seems alot of duplication need a better way to represent
+    # device info like a config file
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--profile', type=str, help='Name of astro profile')
+    dev_args, unknown = parser.parse_known_args(sys.argv)
+
+    logging.debug(f'run_getpos: dev_args, unknown = {dev_args} {unknown}')
+
+    result_fname = './autofocus_auto_origpos.json'
+    cmd_line = PYTHON_EXE_PATH + ' '
+    script = 'pyastrometry_cli_main.py'
+    if PYASTROMETRY_SCRIPT_PATH is not None:
+        script = os.path.join(PYASTROMETRY_SCRIPT_PATH, script)
+    cmd_line += f'{script} getpos '
+    cmd_line += f'--outfile {result_fname} '
+    if dev_args.profile is not None:
+        cmd_line += f'--profile {dev_args.profile}'
+
+    # unlink previous solve if any
+    if os.path.isfile(result_fname):
+        os.unlink(result_fname)
+
+    rc, output = run_program(cmd_line, label='platesolve')
+
+    if rc < 0:
+        logging.error(f'run_platesolve: return code was {rc}!')
+        return None
+
+    try:
+        result_file = open(result_fname, 'r')
+    except OSError as err:
+        print(f"Error opening results file: {err}")
+        return None
+
+    try:
+        solve_dict = json.load(result_file)
+        target_str = solve_dict['ra2000'] + " "
+        target_str += solve_dict['dec2000']
+        logging.info(f"target_str = {target_str}")
+
+        radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
+                          frame='fk5', equinox='J2000')
+
+    except Exception as err:
+        print(f"Error converting solve results! {err}")
+        return None
+
+    logging.info(f'radec = {radec.to_string()}')
+    return radec    
+    
+    
 def run_findstars(curpos, args, lon=None):
     result_fname = './autofocus_auto_starlist.dat'
     cmd_line = PYTHON_EXE_PATH + ' '
@@ -258,6 +312,47 @@ def run_precise_slew(target, args, extra_args):
 
     return True
 
+def run_slew(target, args, extra_args):
+    # parse out device info
+    # FIXME seems alot of duplication need a better way to represent
+    # device info like a config file
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--profile', type=str, help='Name of astro profile')
+    parser.add_argument('--mount', type=str, help='Name of mount driver')
+
+    dev_args, unknown = parser.parse_known_args(sys.argv)
+
+    logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
+
+    cmd_line = PYTHON_EXE_PATH + ' '
+    script = 'pyastrometry_cli_main.py'
+    if PYASTROMETRY_SCRIPT_PATH is not None:
+        script = os.path.join(PYASTROMETRY_SCRIPT_PATH, script)
+    cmd_line += f'{script} slew '
+    rastr = target.ra.to_string(u.hour, sep=":", pad=True)
+    cmd_line += rastr + ' '
+    decstr = target.dec.to_string(alwayssign=True, sep=":", pad=True)
+    cmd_line += f'" {decstr}" '
+
+
+    # use json to handle double quotes in camera and mount
+    # arguments which might be passed as something like "CCD Simulator"
+    # and the shlex.split() will split them
+    if dev_args.mount is not None:
+        cmd_line += f'--mount {json.dumps(dev_args.mount)} '
+
+    if dev_args.profile is not None:
+        cmd_line += f'--profile {dev_args.profile}'
+
+    rc, output = run_program(cmd_line, label='precise_slew')
+
+    if rc != 0:
+        logging.error(f'run_precise_slew: return code was {rc}!')
+        return None
+
+    return True    
+    
 def run_autofocus(args, extra_args):
     # FIXME need to add parameters for autofocus
     parser = argparse.ArgumentParser()
@@ -342,6 +437,9 @@ if __name__ == '__main__':
     parser.add_argument('--maxtries', type=int, default=3,
                         help='Number of stars to try before giving up')
     parser.add_argument('--usedebugpaths', action='store_true', help='Run auxilary programs from checked out sources')
+    #parser.add_argument('--noplatesolve', action='store_true', help='Just slew do not improve accuracy with plate solving')
+    parser.add_argument('--preciseslewstar', action='store_true', help='Use precise slew to star')
+    parser.add_argument('--preciseslewreturn', action='store_true', help='Use precise slew returning from star')
 
     args, extra_args = parser.parse_known_args()
 
@@ -375,7 +473,10 @@ if __name__ == '__main__':
         ap.read(args.profile)
         lon = ap.observatory.location.get('longitude', None)
 
-    cur_radec = run_platesolve()
+    if args.preciseslewreturn or args.preciseslewstar:
+        cur_radec = run_platesolve()
+    else:
+        cur_radec = run_getpos()
 
     if cur_radec is None:
         logging.error('Initial plate solve failed!')
@@ -396,8 +497,11 @@ if __name__ == '__main__':
     for sao, radec in star_list:
         logging.info(f'Trying SAO{sao} at {radec.to_string("hmsdms", sep=":")}')
 
-        slew_result = run_precise_slew(radec, args, extra_args)
-
+        if args.preciseslewstar:
+            slew_result = run_precise_slew(radec, args, extra_args)
+        else:
+            slew_result = run_slew(radec, args, extra_args)
+        
         logging.debug(f'slew_result = {slew_result}')
 
         if slew_result:
@@ -424,10 +528,13 @@ if __name__ == '__main__':
     else:
         logging.info('Autofocus sucessful!')
 
-
     # return to original position
     logging.info(f'Returning to original position {cur_radec.to_string("hmsdms", sep=":")}')
-    return_result = run_precise_slew(cur_radec, args, extra_args)
+    #return_result = run_precise_slew(cur_radec, args, extra_args)
+    if args.preciseslewreturn:
+        return_result = run_precise_slew(cur_radec, args, extra_args)
+    else:
+        return_result = run_slew(cur_radec, args, extra_args)
     logging.debug(f'return_result = {return_result}')
     if not return_result:
         logging.error('Failed to return to original position!')
