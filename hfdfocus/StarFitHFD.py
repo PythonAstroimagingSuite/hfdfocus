@@ -349,7 +349,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     majax = axes[0][2]
     minax = axes[1][2]
     ecc = math.sqrt(1.0-(minax/majax)**2)
-    logging.info(f'Major/Minor/Ecc = {majax} {minax} {ecc}')
+    logging.debug(f'Major/Minor/Ecc = {majax} {minax} {ecc}')
 
     if ecc > 0.75:
         logging.warning(f'fERROR find_star(): Eccentricity {ecc} is outside acceptable range - probably not alone')

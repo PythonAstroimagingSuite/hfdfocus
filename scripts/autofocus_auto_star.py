@@ -12,6 +12,9 @@ import argparse
 import logging
 import subprocess
 
+from astropy import units as u
+from astropy.coordinates import Angle, SkyCoord
+
 from pyastroprofile.AstroProfile import AstroProfile
 
 # FIXME this should be handled automaticall!
@@ -57,7 +60,7 @@ def run_program(cmd_line, label='', trimlog=True):
                 out = ' '.join(words[3:])
             else:
                 out = l.strip()
-            logging.debug(f'{label}: {out}')
+            logging.info(f'{label}: {out}')
             output += l
         logging.debug('end of output')
 
@@ -112,23 +115,23 @@ def run_platesolve():
     try:
         result_file = open(result_fname, 'r')
     except OSError as err:
-        print(f"Error opening results file: {err}")
+        logging.error(f"Error opening results file: {err}")
         return None
 
     try:
         solve_dict = json.load(result_file)
         target_str = solve_dict['ra2000'] + " "
         target_str += solve_dict['dec2000']
-        logging.info(f"target_str = {target_str}")
+        logging.debug(f"target_str = {target_str}")
 
         radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
                           frame='fk5', equinox='J2000')
 
     except Exception as err:
-        print(f"Error converting solve results! {err}")
+        logging.error(f"Error converting solve results! {err}")
         return None
 
-    logging.info(f'radec = {radec.to_string()}')
+    logging.debug(f'radec = {radec.to_string()}')
     return radec
 
 def run_getpos():
@@ -165,26 +168,26 @@ def run_getpos():
     try:
         result_file = open(result_fname, 'r')
     except OSError as err:
-        print(f"Error opening results file: {err}")
+        logging.error(f"Error opening results file: {err}")
         return None
 
     try:
         solve_dict = json.load(result_file)
         target_str = solve_dict['ra2000'] + " "
         target_str += solve_dict['dec2000']
-        logging.info(f"target_str = {target_str}")
+        logging.debug(f"target_str = {target_str}")
 
         radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
                           frame='fk5', equinox='J2000')
 
     except Exception as err:
-        print(f"Error converting solve results! {err}")
+        logging.error(f"Error converting solve results! {err}")
         return None
 
-    logging.info(f'radec = {radec.to_string()}')
-    return radec    
-    
-    
+    logging.debug(f'radec = {radec.to_string()}')
+    return radec
+
+
 def run_findstars(curpos, args, lon=None):
     result_fname = './autofocus_auto_starlist.dat'
     cmd_line = PYTHON_EXE_PATH + ' '
@@ -228,14 +231,14 @@ def run_findstars(curpos, args, lon=None):
     try:
         result_file = open(result_fname, 'r')
     except OSError as err:
-        print(f"Error opening results file: {err}")
+        logging.error(f"Error opening results file: {err}")
         return None
 
     star_list = []
     try:
         nlines = 0
         for l in result_file.readlines():
-            print(l.strip())
+            #print(l.strip())
             if nlines == 0:
                 xxx, field = l.strip().split('=')
                 nstars = int(field)
@@ -249,16 +252,16 @@ def run_findstars(curpos, args, lon=None):
 
             catidx, distdeg, sao, rastr, decstr, vmag, nneigh = l.strip().split(',')
             target_str = rastr + " " + decstr
-            logging.info(f"star target_str = {target_str}")
+            logging.debug(f"star target_str = {target_str}")
             radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
                               frame='fk5', equinox='J2000')
             star_list.append((sao, radec))
 
     except Exception as err:
-        print(f"Error converting solve results! {err}")
+        logging.error(f"Error converting solve results! {err}")
         return None
 
-    logging.info(f'star_list = {star_list}')
+    #logging.debug(f'star_list = {star_list}')
     return star_list
 
 def run_precise_slew(target, args, extra_args):
@@ -351,8 +354,8 @@ def run_slew(target, args, extra_args):
         logging.error(f'run_precise_slew: return code was {rc}!')
         return None
 
-    return True    
-    
+    return True
+
 def run_autofocus(args, extra_args):
     # FIXME need to add parameters for autofocus
     parser = argparse.ArgumentParser()
@@ -404,9 +407,6 @@ def run_autofocus(args, extra_args):
     return True
 
 
-from astropy import units as u
-from astropy.coordinates import Angle, SkyCoord
-
 if __name__ == '__main__':
     logging.basicConfig(filename='autofocus_auto_star.log',
                         filemode='w',
@@ -418,7 +418,7 @@ if __name__ == '__main__':
     log = logging.getLogger()
     formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
@@ -443,8 +443,8 @@ if __name__ == '__main__':
 
     args, extra_args = parser.parse_known_args()
 
-    logging.info(f'args = {args}')
-    logging.info(f'extra_args = {extra_args}')
+    logging.debug(f'args = {args}')
+    logging.debug(f'extra_args = {extra_args}')
 
     # FIXME setup DEBUG paths if we're running all from git
     if args.usedebugpaths:
@@ -462,9 +462,9 @@ if __name__ == '__main__':
         AUTOFOCUS_DATA_PATH = None
         PYASTROMETRY_SCRIPT_PATH = None
 
-    logging.info(f'AUTOFOCUS_SCRIPT_PATH = {AUTOFOCUS_SCRIPT_PATH}')
-    logging.info(f'AUTOFOCUS_DATA_PATH = {AUTOFOCUS_DATA_PATH}')
-    logging.info(f'PYASTROMETRY_SCRIPT_PATH = {PYASTROMETRY_SCRIPT_PATH}')
+    logging.debug(f'AUTOFOCUS_SCRIPT_PATH = {AUTOFOCUS_SCRIPT_PATH}')
+    logging.debug(f'AUTOFOCUS_DATA_PATH = {AUTOFOCUS_DATA_PATH}')
+    logging.debug(f'PYASTROMETRY_SCRIPT_PATH = {PYASTROMETRY_SCRIPT_PATH}')
 
     # get astro profile if specified
     if args.profile is not None:
@@ -474,19 +474,21 @@ if __name__ == '__main__':
         lon = ap.observatory.location.get('longitude', None)
 
     if args.preciseslewreturn or args.preciseslewstar:
+        logging.info('Getting current position by plate solving')
         cur_radec = run_platesolve()
     else:
+        logging.info('Getting current position from mount')
         cur_radec = run_getpos()
 
     if cur_radec is None:
-        logging.error('Initial plate solve failed!')
+        logging.error('Could not determine current position!')
         sys.exit(1)
 
     logging.info(f'Original location is {cur_radec.to_string("hmsdms", sep=":")}')
 
+    logging.info('Finding nearby candiate stars')
     star_list = run_findstars(cur_radec, args, lon=lon)
-
-    logging.info(f'Star list = {star_list}')
+    #logging.debug(f'Star list = {star_list}')
 
     if star_list is None or len(star_list) < 1:
         logging.error('No star candidate available!')
@@ -501,7 +503,7 @@ if __name__ == '__main__':
             slew_result = run_precise_slew(radec, args, extra_args)
         else:
             slew_result = run_slew(radec, args, extra_args)
-        
+
         logging.debug(f'slew_result = {slew_result}')
 
         if slew_result:
@@ -515,7 +517,7 @@ if __name__ == '__main__':
                     sys.exit(1)
                 continue
             else:
-                logging.info(f'Autofocus suceeded - result = {focus_result}')
+                logging.info(f'Autofocus succeeded - result = {focus_result}')
                 result = focus_result
                 break
         else:

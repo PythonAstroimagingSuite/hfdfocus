@@ -158,9 +158,11 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
         ncap += 1
         avg_hfd += hfd
 
+        msg = f'{tag} pos iter #{i+1} focus {fpos} ' \
+              f'HFD {hfd:5.2f} AVG:{avg_hfd/(ncap):5.2f}'
+        logging.info(msg)
         if args.debugplots:
-            fig.suptitle(f'{tag} pos iter #{i+1} focus {fpos} ' \
-                         f'HFD {hfd:5.2f} AVG:{avg_hfd/(ncap):5.2f}')
+            fig.suptitle(msg)
             fig.show()
             plt.pause(args.debugplotsdelay)
 
@@ -206,14 +208,14 @@ if __name__ == '__main__':
 
     # add to screen as well
     log = logging.getLogger()
-    formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+    formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s ')
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
     args = parse_commandline()
-    logging.info(f'args = {args}')
+    logging.debug(f'args = {args}')
 
     # connect focuser and camera
     if not args.simul:
@@ -224,7 +226,7 @@ if __name__ == '__main__':
             ap.read(args.profile)
             logging.debug(f'profile = {ap.equipment}')
             camera_driver = ap.equipment.camera.driver
-            print(dir(ap.equipment.focuser))
+            #print(dir(ap.equipment.focuser))
             focuser_driver = ap.equipment.focuser.get('driver')
             FOCUSER_MIN_POS = ap.equipment.focuser.get('minpos', None)
             FOCUSER_MAX_POS = ap.equipment.focuser.get('maxpos', None)
@@ -249,15 +251,15 @@ if __name__ == '__main__':
         sdi.connect_backend()
 
         #focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
-        logging.info(f'Connecting to focuser driver {focuser_driver}')
+        logging.debug(f'Connecting to focuser driver {focuser_driver}')
         focuser = sdi.connect_focuser(focuser_driver)
-        logging.info(f'focuser = {focuser}')
+        logging.debug(f'focuser = {focuser}')
         if not focuser:
             logging.error(f'Unabled to connect to focuser driver {focuser_driver}')
             sys.exit(-1)
-        logging.info(f'Connecting to camera driver {camera_driver}')
+        logging.debug(f'Connecting to camera driver {camera_driver}')
         cam = sdi.connect_camera(camera_driver)
-        logging.info(f'cam = {cam}')
+        logging.debug(f'cam = {cam}')
         if not cam:
             logging.error(f'Unabled to connect to camera driver {camera_driver}')
             sys.exit(-1)
@@ -285,12 +287,10 @@ if __name__ == '__main__':
 
     # create plots if needed
     if args.debugplots:
-        logging.info('Creating figure')
+        logging.debug('Creating figure')
 #        fig2 = plt.figure()
 #        ax_hfd = fig2.add_subplot(111)
 #        hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
-
-
         fig = plt.figure(figsize=(4.5,2))
         ax_1d = fig.add_subplot(121)
         ax_2d = fig.add_subplot(122)

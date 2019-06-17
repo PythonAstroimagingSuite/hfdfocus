@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    logging.info(f'args = {args}')
+    logging.debug(f'args = {args}')
 
     # complain if output file exists
     if args.outfile is not None:
@@ -103,7 +103,7 @@ if __name__ == '__main__':
             now = Time.now()
             local_sidtime = now.sidereal_time('apparent', obs_lon*u.degree)
             time_fmt = '%H:%M:%S'
-            logging.info(f'Local sidereal time is {local_sidtime.hms}')
+            logging.debug(f'Local sidereal time is {local_sidtime.hms}')
 
     # if a sid time is given then get rest of args
     if local_sidtime is not None:
@@ -119,18 +119,18 @@ if __name__ == '__main__':
             sys.exit(1)
         force_side = args.onlyside
 
-    logging.info(f'Using pier side constraint of {force_side} ' \
+    logging.debug(f'Using pier side constraint of {force_side} ' \
                      f'and LST = {local_sidtime.hms}')
-    logging.info(f'Using meridian threshold of {meridian_thres.to_string(unit=u.hour)}')
+    logging.debug(f'Using meridian threshold of {meridian_thres.to_string(unit=u.hour)}')
 
     saocat = load_SAOCatalog_binary(args.cat)
-    logging.info(f'Loaded {len(saocat.id)} stars')
+    logging.debug(f'Loaded {len(saocat.id)} stars')
 
     # 'fast' compute distance between points
     # first convert input ra/dec to angles
     target_str = args.ra2000 + " "
     target_str += args.dec2000
-    logging.info(f"target_str = {target_str}")
+    logging.debug(f"target_str = {target_str}")
 
     try:
         target = SkyCoord(target_str, unit=(u.hourangle, u.deg),
@@ -150,17 +150,17 @@ if __name__ == '__main__':
         sys.exit(1)
 
     if args.verbose:
-        logging.info('Candidates:')
-        logging.info(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
+        logging.debug('Candidates:')
+        logging.debug(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
         for i in range(0, len(cand_idx)):
             cat_idx = cand_idx[i]
             radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx], unit=u.deg,
                              frame='fk5', equinox='J2000')
-            logging.info(f" {cat_idx}   {np.rad2deg(cand_dist[i]):5.2f} " \
+            logging.debug(f" {cat_idx}   {np.rad2deg(cand_dist[i]):5.2f} " \
                          f"{saocat.id[cat_idx]:>8d} " \
                          f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
                          f"{saocat.vmag[cat_idx]:4.2f}")
-        logging.info('')
+        logging.debug('')
 
     nnear = []
     nnear_idx = []
@@ -173,12 +173,12 @@ if __name__ == '__main__':
         cat_idx = cand_idx[i]
         if args.verbose:
             logging.debug(f'Evaluating cat index={cat_idx} SAO={saocat.id[cat_idx]:>8d}')
-            logging.info("CatIdx    Deg   SAO           RA.DEC (J2000)           VMag")
+            logging.debug("CatIdx    Deg   SAO           RA.DEC (J2000)           VMag")
 
         radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx], unit=u.deg,
                          frame='fk5', equinox='J2000')
         if args.verbose:
-            logging.info(f"{cat_idx}  {np.rad2deg(cand_dist[i]):5.2f} " \
+            logging.debug(f"{cat_idx}  {np.rad2deg(cand_dist[i]):5.2f} " \
                          f"{saocat.id[cat_idx]:>8d} "\
                          f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
                          f"{saocat.vmag[cat_idx]:4.2f}")
@@ -191,13 +191,12 @@ if __name__ == '__main__':
         #logging.debug(f'cand_idx_2 = {cand_idx_2} cand_dist_2 = {cand_dist_2}')
 
         if args.verbose:
-            logging.info('Nearby Candidates:')
-            logging.info(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
+            logging.debug('Nearby Candidates:')
+            logging.debug(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
             for i2 in range(0, len(cand_idx_2)):
                 cat_idx_2 = cand_idx_2[i2]
-                print(i2, cat_idx_2)
                 radec = SkyCoord(saocat.ra[cat_idx_2], saocat.dec[cat_idx_2], unit=u.deg, frame='fk5', equinox='J2000')
-                logging.info(f" {cat_idx_2}   {np.rad2deg(cand_dist_2[i2]):5.2f} " \
+                logging.debug(f" {cat_idx_2}   {np.rad2deg(cand_dist_2[i2]):5.2f} " \
                              f"{saocat.id[cat_idx_2]:>8d} " \
                              f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
                              f"{saocat.vmag[cat_idx_2]:4.2f}")
@@ -214,39 +213,39 @@ if __name__ == '__main__':
             star_ok = False
             nprox_exclude += 1
             if args.verbose:
-                logging.info(f'Excluding star SAO{saocat.id[cat_idx]} due " \
+                logging.debug(f'Excluding star SAO{saocat.id[cat_idx]} due " \
                              f"to neighbor within {exclusion_rad} degrees.')
 
         elif force_side is not None:
             # filter out if on wrong side of pier from where scope is pointing
             hour_angle = (local_sidtime - radec.ra).wrap_at('180d')
-            logging.info(f'SAO{saocat.id[cat_idx]} {radec.ra} {local_sidtime} {hour_angle.degree} {meridian_thres.degree}')
+            logging.debug(f'SAO{saocat.id[cat_idx]} {radec.ra} {local_sidtime} {hour_angle.degree} {meridian_thres.degree}')
             # negative hour angle means the object is EAST of the meridian
 
             if (hour_angle.degree < meridian_thres.degree and force_side == 'WEST'):
-                logging.info('Too far EAST for WEST contraint')
+                logging.debug('Too far EAST for WEST contraint')
                 star_ok = False
             if (hour_angle.degree > -meridian_thres.degree and force_side == 'EAST'):
-                logging.info('Too far WEST for EAST contraint')
+                logging.debug('Too far WEST for EAST contraint')
                 star_ok = False
 
             if not star_ok:
                 npier_exclude += 1
                 if True or args.verbose:
-                    logging.info(f'Excluding star SAO{saocat.id[cat_idx]} due to pier side.')
+                    logging.debug(f'Excluding star SAO{saocat.id[cat_idx]} due to pier side.')
 
         if star_ok:
             nnear.append(len(cand_idx_2))
             nnear_idx.append(cat_idx)
             nnear_dist.append(cand_dist[i])
             if True or args.verbose:
-                logging.info(f'Including star SAO{saocat.id[cat_idx]} ')
+                logging.debug(f'Including star SAO{saocat.id[cat_idx]} ')
 
         if args.verbose:
             logging.info("")
 
-    logging.info(f'{nprox_exclude} stars excluded due to having close neighbors')
-    logging.info(f'{npier_exclude} stars excluded due to wrong pier side')
+    logging.debug(f'{nprox_exclude} stars excluded due to having close neighbors')
+    logging.debug(f'{npier_exclude} stars excluded due to wrong pier side')
 
     if True or args.verbose:
         logging.debug(f'nnear={nnear} nnear_idx={nnear_idx} nnear_dist={nnear_dist}')
@@ -281,28 +280,28 @@ if __name__ == '__main__':
     #logging.debug(f'cand_idx_2 = {cand_idx_2} cand_dist_2 = {cand_dist_2}')
 
     if args.verbose:
-        logging.info(f'List of stars closest to BEST STAR')
-        logging.info(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
+        logging.debug(f'List of stars closest to BEST STAR')
+        logging.debug(" CatIdx    Deg   SAO              RA.DEC (J2000)           VMag")
         for i2 in range(0, len(cand_idx_2)):
             cat_idx_2 = cand_idx_2[i2]
             radec = SkyCoord(saocat.ra[cat_idx_2], saocat.dec[cat_idx_2],
                              unit=u.deg, frame='fk5', equinox='J2000')
-            logging.info(f" {cat_idx_2}   {np.rad2deg(cand_dist_2[i2]):5.2f} " \
+            logging.debug(f" {cat_idx_2}   {np.rad2deg(cand_dist_2[i2]):5.2f} " \
                          f"{saocat.id[cat_idx_2]:>8d} " \
                          f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
                          f"{saocat.vmag[cat_idx_2]:4.2f}")
 
-    logging.info("")
-    logging.info(f'{len(distsort_idx)} candidates within {args.dist} degrees of J2000 ' \
+    logging.debug("")
+    logging.debug(f'{len(distsort_idx)} candidates within {args.dist} degrees of J2000 ' \
                  f'{target.to_string("hmsdms", sep=":"):30s}')
-    logging.info('CatIdx    Deg     SAO           RA.DEC (J2000)            ' \
+    logging.debug('CatIdx    Deg     SAO           RA.DEC (J2000)            ' \
                  'VMag     # near stars')
     for i in range(0, len(distsort_idx)):
         near_idx = distsort_idx[i]
         cat_idx = nnear_idx[near_idx]
         radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx],
                          unit=u.deg, frame='fk5', equinox='J2000')
-        logging.info(f"{cat_idx:>6d}  {np.rad2deg(nnear_dist[near_idx]):5.2f} " \
+        logging.debug(f"{cat_idx:>6d}  {np.rad2deg(nnear_dist[near_idx]):5.2f} " \
                      f"{saocat.id[cat_idx]:>8d}   " \
                      f"{radec.to_string('hmsdms', sep=':', precision=3):30s} "\
                      f"{saocat.vmag[cat_idx]:4.2f}        {nnear[near_idx]}")
