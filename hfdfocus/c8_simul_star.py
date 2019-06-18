@@ -26,6 +26,8 @@ import matplotlib.pyplot as plt
 import scipy.ndimage as ndimage
 from hfdfocus.StarFitHFD import find_brightest_star_HFD
 
+# to silence scipy warning about zoom()
+import warnings
 
 def shrink_star(starimage_data, bgimage_data, reduction):
     """
@@ -42,7 +44,9 @@ def shrink_star(starimage_data, bgimage_data, reduction):
 #    shrunk_star_data = tf.resize(starimage_data,
 #                                    [int(ht*reduction), int(wd*reduction)],
 #                                    order=0, mode='constant', anti_aliasing=True)
-    shrunk_star_data = ndimage.zoom(starimage_data,
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        shrunk_star_data = ndimage.zoom(starimage_data,
                                     [reduction, reduction],
                                     order=0, mode='constant')#, anti_aliasing=True)
     # scale it up so flux is the same

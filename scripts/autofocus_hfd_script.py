@@ -11,6 +11,8 @@ import numpy as np
 #from scipy.stats import siegelslopes
 
 import matplotlib as mpl
+mpl.use("Qt5agg")
+mpl.rcParams['toolbar'] = 'None'
 mpl.rc('font', size=8)
 import matplotlib.pyplot as plt
 
@@ -39,6 +41,12 @@ FOCUSER_MIN_POS = None
 FOCUSER_MAX_POS = None
 FOCUSER_DIR = None
 
+
+def show_fig_and_wait(fig, wait):
+    fig.show()
+    plt.pause(wait)
+#    fig.canvas.flush_events()
+#    time.sleep(wait)
 
 def measure_frame(starimage_data):
     # analyze frame
@@ -164,8 +172,9 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
         logging.info(msg)
         if args.debugplots:
             fig.suptitle(msg)
-            fig.show()
-            plt.pause(args.debugplotsdelay)
+#            fig.show()
+#            plt.pause(args.debugplotsdelay)
+        show_fig_and_wait(fig, args.debugplotsdelay)
 
     if ncap > 0:
         return avg_hfd/ncap
@@ -179,7 +188,7 @@ def parse_commandline():
     parser.add_argument('--focus_dir', type=str, help='IN or OUT')
     parser.add_argument('--focus_start', type=int, help='Starting focus pos')
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
-    parser.add_argument('--debugplotsdelay', type=float, default=1, help='Delay (seconds) showing each plot')
+    parser.add_argument('--debugplotsdelay', type=float, default=0.25, help='Delay (seconds) showing each plot')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
     parser.add_argument('--stayopen', action='store_true', help='stay open when done')
     parser.add_argument('--profile', type=str, help='Name of equipment profile')
@@ -378,6 +387,7 @@ if __name__ == '__main__':
         fig = plt.figure(figsize=(4.5,2))
         ax_1d = fig.add_subplot(121)
         ax_2d = fig.add_subplot(122)
+        plt.pause(0.01)
 
     focus_expos = args.exposure_start
     logging.info(f'Starting exposure is {focus_expos} seconds')
@@ -423,8 +433,9 @@ if __name__ == '__main__':
 
         if args.debugplots:
             fig.suptitle(f'First focus {fpos_1} HFD {hfd_1:5.2f}')
-            fig.show()
-            plt.pause(args.debugplotsdelay)
+#            fig.show()
+#            plt.pause(args.debugplotsdelay)
+        show_fig_and_wait(fig, args.debugplotsdelay)
 
         logging.info(f'INITIAL FOCUS = {fpos_1}  HFD = {hfd_1}')
 
@@ -444,8 +455,9 @@ if __name__ == '__main__':
 
         if args.debugplots:
             fig.suptitle(f'Second focus {fpos_2} HFD {hfd_2:5.2f}')
-            fig.show()
-            plt.pause(args.debugplotsdelay)
+#            fig.show()
+#            plt.pause(args.debugplotsdelay)
+        show_fig_and_wait(fig, args.debugplotsdelay)
 
         # make sure hfd got larger
         if hfd_2 < hfd_1:
@@ -515,8 +527,9 @@ if __name__ == '__main__':
 
     if args.debugplots:
         fig.suptitle(f'Near position focus {fpos_near} HFD {hfd_near:5.2f}')
-        fig.show()
-        plt.pause(args.debugplotsdelay)
+        #fig.show()
+        #plt.pause(args.debugplotsdelay)
+        show_fig_and_wait(fig, args.debugplotsdelay)
 
     # now take several measurements and get average HFD
     avg_near_hfd = average_measure_at_focus_pos(fpos_near, focus_expos, args.numaverage, tag='near')
