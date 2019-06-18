@@ -3,6 +3,7 @@ import sys
 import time
 import argparse
 import logging
+from datetime import datetime
 
 import astropy.io.fits as pyfits
 
@@ -194,16 +195,30 @@ def parse_commandline():
     parser.add_argument('--focusdelay', default=0.5, type=float,  help='Delay (seconds) after focus moves')
     parser.add_argument('--numaverage', default=5, type=int,  help='Number of images to average')
     parser.add_argument('--simuldatadir', type=str,  help='Location of simulated star data')
+    parser.add_argument('--vcurve_rs', type=float, help='VCurve Right Slope')
+    parser.add_argument('--vcurve_ls', type=float, help='VCurve Left Slope')
+    parser.add_argument('--vcurve_rp', type=float, help='VCurve Right PID')
+    parser.add_argument('--vcurve_lp', type=float, help='VCurve Left PID')
+    parser.add_argument('--start_hfd', type=float, help='Starting (outer) HFD value)')
+    parser.add_argument('--near_hfd', type=float, help='Nearer (inner) HFD value)')
+    parser.add_argument('--backlash', type=float, default=0, help='Steps of backlash')
 
     args = parser.parse_args()
     return args
 
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='autofocus_hfd_script.log',
-                        filemode='w',
+    # FIXME assumes tz is set properly in system?
+    now = datetime.now()
+    logfilename = 'autofocus_hfd_script-' + now.strftime('%Y%m%d%H%M%S') + '.log'
+
+#    FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
+    FORMAT = '[%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+
+    logging.basicConfig(filename=logfilename,
+                        filemode='a',
                         level=logging.DEBUG,
-                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        format=FORMAT,
                         datefmt='%Y-%m-%d %H:%M:%S')
 
     # add to screen as well
@@ -217,6 +232,9 @@ if __name__ == '__main__':
     args = parse_commandline()
     logging.debug(f'args = {args}')
 
+    # initialize some variables
+    backlash = 0
+
     # connect focuser and camera
     if not args.simul:
         # load profile
@@ -227,24 +245,37 @@ if __name__ == '__main__':
             logging.debug(f'profile = {ap.equipment}')
             camera_driver = ap.equipment.camera.driver
             #print(dir(ap.equipment.focuser))
+            logging.debug(f'ap.equipment.focuser = {ap.equipment.focuser}')
+            logging.debug(f'ap.settings.autofocus = {ap.settings.autofocus}')
             focuser_driver = ap.equipment.focuser.get('driver')
             FOCUSER_MIN_POS = ap.equipment.focuser.get('minpos', None)
             FOCUSER_MAX_POS = ap.equipment.focuser.get('maxpos', None)
             FOCUSER_DIR = ap.settings.autofocus.get('focus_dir', None)
+            # vcurve_rs = 0.04472660490995652
+            # vcurve_rp = 5.333072819832182
+            # vcurve_ls = -0.045806498798410436
+            # vcurve_lp = -5.22113594480723
+            vcurve_rs = ap.equipment.focuser.get('vcurve_rs', None)
+            vcurve_rp = ap.equipment.focuser.get('vcurve_rp', None)
+            vcurve_ls = ap.equipment.focuser.get('vcurve_ls', None)
+            vcurve_lp = ap.equipment.focuser.get('vcurve_lp', None)
+            logging.debug(f'vcurve_rs,rp,ls,lp = {vcurve_rs} {vcurve_rp} {vcurve_ls} {vcurve_lp}')
+            start_hfd = ap.equipment.focuser.get('start_hfd', None)
+            near_hfd = ap.equipment.focuser.get('near_hfd', None)
+            backlash = ap.equipment.focuser.get('backlash', 0)
         else:
             focuser_driver = args.focuser
             camera_driver = args.camera
             FOCUSER_MIN_POS = args.focus_min
             FOCUSER_MAX_POS = args.focus_max
             FOCUSER_DIR = args.focus_dir
-
-        # since we're on real hardware need a min/max pos
-        if FOCUSER_MIN_POS is None or FOCUSER_MAX_POS is None:
-            logging.error('Must specify a min and max allowed pos for focuser!')
-            sys.exit(1)
-        if FOCUSER_DIR is None:
-            logging.error('Must specify the preferred focus direction!')
-            sys.exit(1)
+            vcurve_rs = args.vcurve_rs
+            vcurve_rp = args.vcurve_rp
+            vcurve_ls = args.vcurve_ls
+            vcurve_lp = args.vcurve_lp
+            start_hfd = args.start_hfd
+            near_hfd = args.near_hfd
+            backlash = args.backlash
 
         sdi = SDI()
 
@@ -272,13 +303,66 @@ if __name__ == '__main__':
         else:
             simul_star = C8_F7_Star_Simulator()
 
+        # from 2019/05/20 C8 @ f/7 - seemed to work well with L filter (only tested)
+        vcurve_rs = 0.04472660490995652
+        vcurve_rp = 5.333072819832182
+        vcurve_ls = -0.045806498798410436
+        vcurve_lp = -5.22113594480723
+
         if args.focus_dir is not None:
             FOCUSER_DIR = args.focus_dir
         else:
-            logging.info('--simul mode choosing focus dir of IN since none specified')
+            logging.info('Since --simul mode active focus dir of IN since none specified.')
             FOCUSER_DIR = 'IN'
 
-    logging.info(f'Using focus min/max/dir of {FOCUSER_MIN_POS} {FOCUSER_MAX_POS} {FOCUSER_DIR}')
+        if args.focus_min is not None:
+            FOCUSER_MIN_POS = args.focus_min
+        else:
+            logging.info('Since --simul mode active FOCUSER_MIN_POS set to 5000 since none specified.')
+            FOCUSER_MIN_POS = 5000
+
+        if args.focus_max is not None:
+            FOCUSER_MAX_POS = args.focus_max
+        else:
+            logging.info('Since --simul mode active FOCUSER_MAX_POS set to 12000 since none specified.')
+            FOCUSER_MAX_POS = 12000
+
+        if args.start_hfd is not None:
+            start_hfd = args.start_hfd
+        else:
+            logging.info('Since --simul mode active start_hfd set to 25 since none specified.')
+            start_hfd = 25
+
+        if args.near_hfd is not None:
+            near_hfd = args.near_hfd
+        else:
+            logging.info('Since --simul mode active near_hfd set to 12 since none specified.')
+            near_hfd = 12
+
+    # some sanity checks
+    if None in [near_hfd, start_hfd]:
+        logging.error('Must specify both start and near HFD values.')
+        sys.exit(1)
+
+    if None in [vcurve_rs, vcurve_rp, vcurve_ls, vcurve_lp]:
+        logging.error('Must specify VCurve Parameters!')
+        sys.exit(1)
+
+    # since we're on real hardware need a min/max pos
+    if FOCUSER_MIN_POS is None or FOCUSER_MAX_POS is None:
+        logging.error('Must specify a min and max allowed pos for focuser!')
+        sys.exit(1)
+
+    if FOCUSER_DIR is None:
+        logging.error('Must specify the preferred focus direction!')
+        sys.exit(1)
+
+
+    logging.debug(f'Using focus min/max/dir of {FOCUSER_MIN_POS} {FOCUSER_MAX_POS} {FOCUSER_DIR}')
+
+    if FOCUSER_MAX_POS <= FOCUSER_MIN_POS:
+        logging.error('Focus max position must be less than focus min position!')
+        sys.exit(1)
 
     # create output dir
     datestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())
@@ -298,17 +382,13 @@ if __name__ == '__main__':
     focus_expos = args.exposure_start
     logging.info(f'Starting exposure is {focus_expos} seconds')
 
-    # vcurve parameters
-#    vcurve_rs = 0.04462570065893874
-#    vcurve_rp = 4.959828107421345
-#    vcurve_ls =-0.04565294355776672
-#    vcurve_lp =-4.848226361604247
-
+    # now get from profile or command line only!
+    # here for reference only
     # from 2019/05/20 C8 @ f/7 - seemed to work well with L filter (only tested)
-    vcurve_rs = 0.04472660490995652
-    vcurve_rp = 5.333072819832182
-    vcurve_ls = -0.045806498798410436
-    vcurve_lp = -5.22113594480723
+    # vcurve_rs = 0.04472660490995652
+    # vcurve_rp = 5.333072819832182
+    # vcurve_ls = -0.045806498798410436
+    # vcurve_lp = -5.22113594480723
 
     if args.focus_start is None:
         if not args.simul:
@@ -383,18 +463,18 @@ if __name__ == '__main__':
         logging.error('Could not find right side for focusing')
         sys.exit(1)
 
-    # compute location for desired initial HFD
-    initial_hfd = 24
-    fpos_initial = fpos_2 - fdir*int(abs((initial_hfd-hfd_2)/vslope))
-    logging.info(f'Initial HFD = {initial_hfd} pred focus = {fpos_initial}')
+    # compute location for desired Start HFD
+    #initial_hfd = 24
+    fpos_start = fpos_2 - fdir*int(abs((start_hfd-hfd_2)/vslope))
+    logging.info(f'Start HFD = {start_hfd} pred focus = {fpos_start}')
 
     # figure out direction
-    backlash = 200
-    fpos_pre_initial = fpos_initial - fdir*backlash
+    #backlash = 200
+    fpos_pre_start = fpos_start - fdir*backlash
 
-    logging.info(f'Moving to pre-initial pos {fpos_pre_initial}')
+    logging.info(f'Moving to pre-start pos {fpos_pre_start}')
     if not args.simul:
-        move_focuser(fpos_pre_initial)
+        move_focuser(fpos_pre_startl)
         time.sleep(0.5)
 
 #    hfd_initial = measure_at_focus_pos(fpos_pre_initial, focus_expos)
@@ -413,40 +493,40 @@ if __name__ == '__main__':
 #        plt.pause(args.debugplotsdelay)
 
     # now take several measurements and get average HFD
-    avg_initial_hfd = average_measure_at_focus_pos(fpos_initial, focus_expos, args.numaverage, tag='initial')
+    avg_start_hfd = average_measure_at_focus_pos(fpos_start, focus_expos, args.numaverage, tag='start')
 
-    logging.info(f'INITIAL POSITION FOCUS AVERAGE HFD = {avg_initial_hfd}')
+    logging.info(f'START POSITION FOCUS AVERAGE HFD = {avg_start_hfd}')
 
-    # now based on average at initial compute inner HFD location
-    # compute location for desired initial HFD
-    inner_hfd = 12
-    fpos_inner = fpos_initial + fdir*int(abs((inner_hfd-avg_initial_hfd)/vslope))
-    logging.info(f'Inner HFD = {inner_hfd} pred focus = {fpos_inner}')
+    # now based on average at start compute near HFD location
+    # compute location for desired start HFD
+    #inner_hfd = 12
+    fpos_near = fpos_start + fdir*int(abs((near_hfd-avg_start_hfd)/vslope))
+    logging.info(f'Near HFD = {near_hfd} pred focus = {fpos_near}')
 
-    hfd_inner = measure_at_focus_pos(fpos_inner, focus_expos)
+    hfd_near = measure_at_focus_pos(fpos_near, focus_expos)
 
-    if hfd_inner is None:
+    if hfd_near is None:
         logging.error('No star found!')
         if args.debugplots:
             plt.show()
         sys.exit(1)
 
-    logging.info(f'INNER POSITION FOCUS = {fpos_inner}  HFD = {hfd_inner}')
+    logging.info(f'NEAR POSITION FOCUS = {fpos_near}  HFD = {hfd_near}')
 
     if args.debugplots:
-        fig.suptitle(f'Inner position focus {fpos_inner} HFD {hfd_inner:5.2f}')
+        fig.suptitle(f'Near position focus {fpos_near} HFD {hfd_near:5.2f}')
         fig.show()
         plt.pause(args.debugplotsdelay)
 
     # now take several measurements and get average HFD
-    avg_inner_hfd = average_measure_at_focus_pos(fpos_inner, focus_expos, args.numaverage, tag='inner')
+    avg_near_hfd = average_measure_at_focus_pos(fpos_near, focus_expos, args.numaverage, tag='near')
 
-    logging.info(f'INNER POSITION FOCUS AVERAGE HFD = {avg_inner_hfd}')
+    logging.info(f'NEAR POSITION FOCUS AVERAGE HFD = {avg_near_hfd}')
 
     # now compute best focus
-    fpos_best = int(fpos_inner + fdir*int(abs(avg_inner_hfd/vslope)) + vpid)
+    fpos_best = int(fpos_near + fdir*int(abs(avg_near_hfd/vslope)) + vpid)
 
-    logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_inner} {int(avg_inner_hfd/vslope)} {vpid}')
+    logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_near} {int(avg_near_hfd/vslope)} {vpid}')
 
     # when using the internal 'focus simulator' we don't impose a min/max position limit
     if not args.simul and (fpos_best > FOCUSER_MAX_POS or fpos_best < FOCUSER_MIN_POS):

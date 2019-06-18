@@ -11,6 +11,7 @@ import shlex
 import argparse
 import logging
 import subprocess
+from datetime import datetime
 
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
@@ -53,6 +54,7 @@ def run_program(cmd_line, label='', trimlog=True):
         logging.debug('ps_proc output:')
         output = ''
         for l in ps_proc.stdout:
+            #logging.debug(l.strip())
             if trimlog:
                 # get rid of first 3 'words' which are the
                 # logging info from program
@@ -189,6 +191,8 @@ def run_getpos():
 
 
 def run_findstars(curpos, args, lon=None):
+    logging.info(f'Finding nearby stars within {args.dist} deg around mag {float(args.mag)}')
+
     result_fname = './autofocus_auto_starlist.dat'
     cmd_line = PYTHON_EXE_PATH + ' '
     if AUTOFOCUS_SCRIPT_PATH is not None:
@@ -408,10 +412,18 @@ def run_autofocus(args, extra_args):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='autofocus_auto_star.log',
-                        filemode='w',
+
+    # FIXME assumes tz is set properly in system?
+    now = datetime.now()
+    logfilename = 'autofocus_auto_star-' + now.strftime('%Y%m%d%H%M%S') + '.log'
+
+#    FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
+    FORMAT = '[%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+
+    logging.basicConfig(filename=logfilename,
+                        filemode='a',
                         level=logging.DEBUG,
-                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        format=FORMAT,
                         datefmt='%Y-%m-%d %H:%M:%S')
 
     # add to screen as well
@@ -486,7 +498,6 @@ if __name__ == '__main__':
 
     logging.info(f'Original location is {cur_radec.to_string("hmsdms", sep=":")}')
 
-    logging.info('Finding nearby candiate stars')
     star_list = run_findstars(cur_radec, args, lon=lon)
     #logging.debug(f'Star list = {star_list}')
 
