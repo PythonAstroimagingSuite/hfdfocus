@@ -126,7 +126,7 @@ def move_focuser(pos):
     sdi.wait_on_focuser_move(focuser)
 
 def measure_at_focus_pos(fpos, focus_expos):
-    if not args.simul:
+    if not args.simul or args.forcehw:
         if focuser.get_absolute_position() != fpos:
             logging.info(f'Moving focuser to {fpos}')
             move_focuser(fpos)
@@ -143,7 +143,7 @@ def measure_at_focus_pos(fpos, focus_expos):
     return rc
 
 def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
-    if not args.simul:
+    if not args.simul or args.forcehw:
         if focuser.get_absolute_position() != fpos:
             logging.info(f'Moving focuser to {fpos}')
             move_focuser(fpos)
@@ -174,7 +174,7 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
             fig.suptitle(msg)
 #            fig.show()
 #            plt.pause(args.debugplotsdelay)
-        show_fig_and_wait(fig, args.debugplotsdelay)
+            show_fig_and_wait(fig, args.debugplotsdelay)
 
     if ncap > 0:
         return avg_hfd/ncap
@@ -211,6 +211,7 @@ def parse_commandline():
     parser.add_argument('--start_hfd', type=float, help='Starting (outer) HFD value)')
     parser.add_argument('--near_hfd', type=float, help='Nearer (inner) HFD value)')
     parser.add_argument('--backlash', type=float, default=0, help='Steps of backlash')
+    parser.add_argument('--forcehw', action='store_true', help='Force connecting to hw in simul mode')
 
     args = parser.parse_args()
     return args
@@ -245,7 +246,7 @@ if __name__ == '__main__':
     backlash = 0
 
     # connect focuser and camera
-    if not args.simul:
+    if not args.simul or args.forcehw:
         # load profile
         if args.profile is not None:
             logging.info(f'Using astro profile {args.profile}')
@@ -303,7 +304,8 @@ if __name__ == '__main__':
         if not cam:
             logging.error(f'Unabled to connect to camera driver {camera_driver}')
             sys.exit(-1)
-    else:
+
+    if args.simul:
         if args.simuldatadir is not None:
             starfile = os.path.join(args.simuldatadir, 'C8_Simul_Defocus_Star.fit')
             bgfile = os.path.join(args.simuldatadir, 'C8_Simul_BG.fit')
@@ -435,7 +437,7 @@ if __name__ == '__main__':
             fig.suptitle(f'First focus {fpos_1} HFD {hfd_1:5.2f}')
 #            fig.show()
 #            plt.pause(args.debugplotsdelay)
-        show_fig_and_wait(fig, args.debugplotsdelay)
+            show_fig_and_wait(fig, args.debugplotsdelay)
 
         logging.info(f'INITIAL FOCUS = {fpos_1}  HFD = {hfd_1}')
 
@@ -457,7 +459,7 @@ if __name__ == '__main__':
             fig.suptitle(f'Second focus {fpos_2} HFD {hfd_2:5.2f}')
 #            fig.show()
 #            plt.pause(args.debugplotsdelay)
-        show_fig_and_wait(fig, args.debugplotsdelay)
+            show_fig_and_wait(fig, args.debugplotsdelay)
 
         # make sure hfd got larger
         if hfd_2 < hfd_1:
@@ -485,8 +487,8 @@ if __name__ == '__main__':
     fpos_pre_start = fpos_start - fdir*backlash
 
     logging.info(f'Moving to pre-start pos {fpos_pre_start}')
-    if not args.simul:
-        move_focuser(fpos_pre_startl)
+    if not args.simul or args.forcehw:
+        move_focuser(fpos_pre_start)
         time.sleep(0.5)
 
 #    hfd_initial = measure_at_focus_pos(fpos_pre_initial, focus_expos)
