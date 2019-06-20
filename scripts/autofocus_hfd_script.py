@@ -1,5 +1,6 @@
 import os
 import sys
+import glob
 import time
 import argparse
 import logging
@@ -132,7 +133,7 @@ def measure_at_focus_pos(fpos, focus_expos):
             move_focuser(fpos)
             time.sleep(args.focusdelay)
 
-    imgname = os.path.join(imagesdir, f'vcurve_focuspos_{fpos}.fit')
+    imgname = os.path.join(IMAGESDIR, f'vcurve_focuspos_{fpos}.fit')
     if not args.simul:
         rc = take_exposure_and_measure_star(imgname, focus_expos)
     else:
@@ -152,7 +153,7 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
     avg_hfd = 0
     ncap = 0
     for i in range(0, niter):
-        imgname = os.path.join(imagesdir, f'vcurve_focuspos_{tag}{i:02d}_{fpos}.fit')
+        imgname = os.path.join(IMAGESDIR, f'vcurve_focuspos_{tag}{i:02d}_{fpos}.fit')
         if not args.simul:
             hfd = take_exposure_and_measure_star(imgname, focus_expos)
         else:
@@ -180,6 +181,25 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
         return avg_hfd/ncap
     else:
         return None
+
+def cleanup_files():
+    if args.keepfiles:
+        logging.debug('Keeping focus image files.')
+        return
+
+    if IMAGESDIR is not None and IMAGESDIR != '':
+        if os.path.isdir(IMAGESDIR):
+            logging.debug('Removing focus files')
+            fit_files = glob.glob(os.path.join(IMAGESDIR, '*.fit'))
+            fits_files = glob.glob(os.path.join(IMAGESDIR, '*.fits'))
+            log_files = glob.glob(os.path.join(IMAGESDIR, '*.log'))
+
+            files = list(set(fit_files + fits_files + log_files))
+            for f in files:
+                logging.info(f'Would have removed {f}')
+
+            logging.info(f'would have rmdir {IMAGESDIR}')
+
 
 def parse_commandline():
     parser = argparse.ArgumentParser()
@@ -212,6 +232,7 @@ def parse_commandline():
     parser.add_argument('--near_hfd', type=float, help='Nearer (inner) HFD value)')
     parser.add_argument('--backlash', type=float, default=0, help='Steps of backlash')
     parser.add_argument('--forcehw', action='store_true', help='Force connecting to hw in simul mode')
+    parser.add_argument('--keepfiles', action='store_true', help='Keep images taken during focusing')
 
     args = parser.parse_args()
     return args
@@ -377,8 +398,8 @@ if __name__ == '__main__':
 
     # create output dir
     datestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())
-    imagesdir = datestr
-    os.mkdir(imagesdir)
+    IMAGESDIR = datestr
+    os.mkdir(IMAGESDIR)
 
     # create plots if needed
     if args.debugplots:
@@ -420,6 +441,7 @@ if __name__ == '__main__':
         vpid = vcurve_rp
     else:
         logging.error(f'Unknown focus direction {FOCUSER_DIR} - exitting!')
+        cleanup_files()
         sys.exit(1)
 
     ntries = 0
@@ -431,6 +453,7 @@ if __name__ == '__main__':
             logging.error('No star found!')
             if args.debugplots:
                 plt.show()
+            cleanup_files()
             sys.exit(1)
 
         if args.debugplots:
@@ -451,6 +474,7 @@ if __name__ == '__main__':
             logging.error('No star found!')
             if args.debugplots:
                 plt.show()
+            cleanup_files()
             sys.exit(1)
 
         logging.info(f'SECOND FOCUS = {fpos_2}  HFD = {hfd_2}')
@@ -475,6 +499,7 @@ if __name__ == '__main__':
 
     if not right_side:
         logging.error('Could not find right side for focusing')
+        cleanup_files()
         sys.exit(1)
 
     # compute location for desired Start HFD
@@ -523,6 +548,7 @@ if __name__ == '__main__':
         logging.error('No star found!')
         if args.debugplots:
             plt.show()
+        cleanup_files()
         sys.exit(1)
 
     logging.info(f'NEAR POSITION FOCUS = {fpos_near}  HFD = {hfd_near}')
@@ -553,6 +579,7 @@ if __name__ == '__main__':
             logging.error('No star found!')
             if args.debugplots:
                 plt.show()
+            cleanup_files()
             sys.exit(1)
 
         logging.info(f'BEST FOCUS POSITION = {fpos_best} HFD = {best_hfd}')
@@ -566,3 +593,5 @@ if __name__ == '__main__':
             plt.show()
         else:
             plt.pause(5)
+
+    cleanup_files()
