@@ -207,7 +207,8 @@ def parse_commandline():
     parser.add_argument('--focus_max', type=int, help='Highest focus travel allowed')
     parser.add_argument('--focus_dir', type=str, help='IN or OUT')
     parser.add_argument('--focus_start', type=int, help='Starting focus pos')
-    parser.add_argument('--debugplots', action='store_true', help='show debug plots')
+    parser.add_argument('--debug', action='store_true', help='Show debug output on console')
+    parser.add_argument('--debugplots', action='store_true', help='Show debug plots')
     parser.add_argument('--debugplotsdelay', type=float, default=0.25, help='Delay (seconds) showing each plot')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
     parser.add_argument('--stayopen', action='store_true', help='stay open when done')
@@ -263,6 +264,9 @@ if __name__ == '__main__':
     args = parse_commandline()
     logging.debug(f'args = {args}')
 
+    if args.debug:
+        ch.setLevel(logging.DEBUG)
+
     # initialize some variables
     backlash = 0
 
@@ -286,14 +290,14 @@ if __name__ == '__main__':
             # vcurve_rp = 5.333072819832182
             # vcurve_ls = -0.045806498798410436
             # vcurve_lp = -5.22113594480723
-            vcurve_rs = ap.equipment.focuser.get('vcurve_rs', None)
-            vcurve_rp = ap.equipment.focuser.get('vcurve_rp', None)
-            vcurve_ls = ap.equipment.focuser.get('vcurve_ls', None)
-            vcurve_lp = ap.equipment.focuser.get('vcurve_lp', None)
+            vcurve_rs = ap.settings.autofocus.get('vcurve_rs', None)
+            vcurve_rp = ap.settings.autofocus.get('vcurve_rp', None)
+            vcurve_ls = ap.settings.autofocus.get('vcurve_ls', None)
+            vcurve_lp = ap.settings.autofocus.get('vcurve_lp', None)
             logging.debug(f'vcurve_rs,rp,ls,lp = {vcurve_rs} {vcurve_rp} {vcurve_ls} {vcurve_lp}')
-            start_hfd = ap.equipment.focuser.get('start_hfd', None)
-            near_hfd = ap.equipment.focuser.get('near_hfd', None)
-            backlash = ap.equipment.focuser.get('backlash', 0)
+            start_hfd = ap.settings.autofocus.get('start_hfd', None)
+            near_hfd = ap.settings.autofocus.get('near_hfd', None)
+            backlash = ap.settings.autofocus.get('backlash', 0)
         else:
             focuser_driver = args.focuser
             camera_driver = args.camera
