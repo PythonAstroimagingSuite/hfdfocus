@@ -200,6 +200,9 @@ def cleanup_files():
 
             logging.info(f'would have rmdir {IMAGESDIR}')
 
+def restore_focus_pos(pos):
+    logging.info(f'Returning focuser to initial position {pos}')
+    return move_focuser(pos)
 
 def parse_commandline():
     parser = argparse.ArgumentParser()
@@ -416,6 +419,9 @@ if __name__ == '__main__':
         ax_2d = fig.add_subplot(122)
         plt.pause(0.01)
 
+    # save initial focus position
+
+
     focus_expos = args.exposure_start
     logging.info(f'Starting exposure is {focus_expos} seconds')
 
@@ -434,6 +440,9 @@ if __name__ == '__main__':
             fpos_1 = 8000
     else:
         fpos_1 = args.focus_start
+
+    # save starting position for if we need to restore
+    starting_focus_pos = fpos_1
 
     if FOCUSER_DIR == 'OUT':
         fdir = 1
@@ -478,6 +487,8 @@ if __name__ == '__main__':
             logging.error('No star found!')
             if args.debugplots:
                 plt.show()
+            if not args.simul or args.forcehw:
+                restore_focus_pos(starting_focus_pos)
             cleanup_files()
             sys.exit(1)
 
@@ -504,6 +515,8 @@ if __name__ == '__main__':
     if not right_side:
         logging.error('Could not find right side for focusing')
         cleanup_files()
+        if not args.simul or args.forcehw:
+            restore_focus_pos(starting_focus_pos)
         sys.exit(1)
 
     # compute location for desired Start HFD
@@ -552,6 +565,8 @@ if __name__ == '__main__':
         logging.error('No star found!')
         if args.debugplots:
             plt.show()
+        if not args.simul or args.forcehw:
+            restore_focus_pos(starting_focus_pos)
         cleanup_files()
         sys.exit(1)
 
@@ -574,8 +589,9 @@ if __name__ == '__main__':
     logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_near} {int(avg_near_hfd/vslope)} {vpid}')
 
     # when using the internal 'focus simulator' we don't impose a min/max position limit
-    if not args.simul and (fpos_best > FOCUSER_MAX_POS or fpos_best < FOCUSER_MIN_POS):
+    if (not args.simul or args.forcehw) and (fpos_best > FOCUSER_MAX_POS or fpos_best < FOCUSER_MIN_POS):
         logging.error(f'Best focus position {fpos_best} is outside allowed range {FOCUSER_MIN_POS} to {FOCUSER_MAX_POS}')
+        restore_focus_pos(starting_focus_pos)
     else:
         best_hfd = measure_at_focus_pos(fpos_best, focus_expos)
 
@@ -583,6 +599,8 @@ if __name__ == '__main__':
             logging.error('No star found!')
             if args.debugplots:
                 plt.show()
+            if not args.simul or args.forcehw:
+                restore_focus_pos(starting_focus_pos)
             cleanup_files()
             sys.exit(1)
 
