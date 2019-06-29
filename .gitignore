@@ -4,6 +4,13 @@
 *.fit
 *.fits
 *.py[cod]
+*.xyls
+*.axy
+*.match
+*.corr
+*.new
+*.rdls
+*.solved
 _templates
 _static
 _build
