@@ -11,6 +11,7 @@ import shlex
 import argparse
 import logging
 import subprocess
+import tempfile
 from datetime import datetime
 
 from astropy import units as u
@@ -92,7 +93,13 @@ def run_platesolve():
 
     logging.debug(f'run_platesolve: dev_args, unknown = {dev_args} {unknown}')
 
-    result_fname = './autofocus_auto_origpos.json'
+    #result_fname = './autofocus_auto_origpos.json'
+
+    tmp_fd, tmp_result_fname = tempfile.mkstemp(suffix='.json')
+    os.close(tmp_fd)
+    result_fname = tmp_result_fname
+    logging.debug(f'Using solvution json tmp file {result_fname}')
+
     cmd_line = PYTHON_EXE_PATH + ' '
     script = 'pyastrometry_cli_main.py'
     if PYASTROMETRY_SCRIPT_PATH is not None:
@@ -110,6 +117,8 @@ def run_platesolve():
 
     rc, output = run_program(cmd_line, label='platesolve')
 
+    # FIXME following might  leave temporary file around if there is
+    #       an exception or it returns before reaching end of function
     if rc < 0:
         logging.error(f'run_platesolve: return code was {rc}!')
         return None
@@ -131,9 +140,16 @@ def run_platesolve():
 
     except Exception as err:
         logging.error(f"Error converting solve results! {err}")
-        return None
+        radec = None
 
-    logging.debug(f'radec = {radec.to_string()}')
+    try:
+        os.unlink(result_fname)
+    except:
+        logging.error(f'Error cleaning up tmp file {result_fname}', exc_info=True)
+
+    if radec is not None:
+        logging.debug(f'radec = {radec.to_string()}')
+
     return radec
 
 def run_getpos():
@@ -147,7 +163,13 @@ def run_getpos():
 
     logging.debug(f'run_getpos: dev_args, unknown = {dev_args} {unknown}')
 
-    result_fname = './autofocus_auto_origpos.json'
+    #result_fname = './autofocus_auto_origpos.json'
+
+    tmp_fd, tmp_result_fname = tempfile.mkstemp(suffix='.json')
+    os.close(tmp_fd)
+    result_fname = tmp_result_fname
+    logging.debug(f'Using solution json tmp file {result_fname}')
+
     cmd_line = PYTHON_EXE_PATH + ' '
     script = 'pyastrometry_cli_main.py'
     if PYASTROMETRY_SCRIPT_PATH is not None:
@@ -184,16 +206,29 @@ def run_getpos():
 
     except Exception as err:
         logging.error(f"Error converting solve results! {err}")
-        return None
+        radec = None
 
-    logging.debug(f'radec = {radec.to_string()}')
+    if radec is not None:
+        logging.debug(f'radec = {radec.to_string()}')
+
+    try:
+        os.unlink(result_fname)
+    except:
+        logging.error(f'Error cleaning up tmp file {result_fname}', exc_info=True)
+
     return radec
 
 
 def run_findstars(curpos, args, lon=None):
     logging.info(f'Finding nearby stars within {args.dist} deg around mag {float(args.mag)}')
 
-    result_fname = './autofocus_auto_starlist.dat'
+    #result_fname = './autofocus_auto_starlist.dat'
+
+    tmp_fd, tmp_result_fname = tempfile.mkstemp(prefix='autofocus_auto_starlist_', suffix='.dat')
+    os.close(tmp_fd)
+    result_fname = tmp_result_fname
+    logging.debug(f'Using solution json tmp file {result_fname}')
+
     cmd_line = PYTHON_EXE_PATH + ' '
     if AUTOFOCUS_SCRIPT_PATH is not None:
         cmd_line += f'{AUTOFOCUS_SCRIPT_PATH}/'
@@ -265,9 +300,15 @@ def run_findstars(curpos, args, lon=None):
 
     except Exception as err:
         logging.error(f"Error converting solve results! {err}")
-        return None
+        star_list = None
 
     #logging.debug(f'star_list = {star_list}')
+
+    try:
+        os.unlink(result_fname)
+    except:
+        logging.error(f'Error cleaning up tmp file {result_fname}', exc_info=True)
+
     return star_list
 
 def run_precise_slew(target, args, extra_args):

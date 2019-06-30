@@ -4,6 +4,7 @@ import glob
 import time
 import argparse
 import logging
+import tempfile
 from datetime import datetime
 
 import astropy.io.fits as pyfits
@@ -54,7 +55,7 @@ def measure_frame(starimage_data):
     bg = 800
     thres = 10000
 
-    xcen, ycen, bg, mad, starmask, alone = find_star(starimage_data, debugfits=True)
+    xcen, ycen, bg, mad, starmask, alone = find_star(starimage_data, debugfits=False)
 
     if np.max(starimage_data[starmask] > args.saturation):
         logging.warning(f'SATURATED PIXELS DETECTED!')
@@ -183,22 +184,24 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
         return None
 
 def cleanup_files():
-    if args.keepfiles:
-        logging.debug('Keeping focus image files.')
-        return
-
-    if IMAGESDIR is not None and IMAGESDIR != '':
-        if os.path.isdir(IMAGESDIR):
-            logging.debug('Removing focus files')
-            fit_files = glob.glob(os.path.join(IMAGESDIR, '*.fit'))
-            fits_files = glob.glob(os.path.join(IMAGESDIR, '*.fits'))
-            log_files = glob.glob(os.path.join(IMAGESDIR, '*.log'))
-
-            files = list(set(fit_files + fits_files + log_files))
-            for f in files:
-                logging.info(f'Would have removed {f}')
-
-            logging.info(f'would have rmdir {IMAGESDIR}')
+    logging.info(f'Cleaning up temp dir {IMAGESDIROBJ}')
+    IMAGESDIROBJ.cleanup()
+#    if args.keepfiles:
+#        logging.debug('Keeping focus image files.')
+#        return
+#
+#    if IMAGESDIR is not None and IMAGESDIR != '':
+#        if os.path.isdir(IMAGESDIR):
+#            logging.debug('Removing focus files')
+#            fit_files = glob.glob(os.path.join(IMAGESDIR, '*.fit'))
+#            fits_files = glob.glob(os.path.join(IMAGESDIR, '*.fits'))
+#            log_files = glob.glob(os.path.join(IMAGESDIR, '*.log'))
+#
+#            files = list(set(fit_files + fits_files + log_files))
+#            for f in files:
+#                logging.info(f'Would have removed {f}')
+#
+#            logging.info(f'would have rmdir {IMAGESDIR}')
 
 def restore_focus_pos(pos):
     logging.info(f'Returning focuser to initial position {pos}')
@@ -405,8 +408,14 @@ if __name__ == '__main__':
 
     # create output dir
     datestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())
-    IMAGESDIR = datestr
-    os.mkdir(IMAGESDIR)
+
+    IMAGESDIROBJ = tempfile.TemporaryDirectory(prefix='autofocus_hfd_script_'+datestr+'_')
+    IMAGESDIR = IMAGESDIROBJ.name
+
+    logging.info(f'Using temporary directory {IMAGESDIR}')
+
+    #IMAGESDIR = datestr
+    #os.mkdir(IMAGESDIR)
 
     # create plots if needed
     if args.debugplots:
