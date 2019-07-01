@@ -324,6 +324,7 @@ if __name__ == '__main__':
                     f" {radec.ra.to_string(unit=u.hour, sep=':', precision=3)},"\
                     f" {radec.dec.to_string(unit=u.degree, sep=':', precision=3)},"\
                     f" {saocat.vmag[cat_idx]}, {nnear[near_idx]}\n")
+        f.flush()
         f.close()
 
 

@@ -142,6 +142,8 @@ def run_platesolve():
         logging.error(f"Error converting solve results! {err}")
         radec = None
 
+    result_file.close()
+
     try:
         os.unlink(result_fname)
     except:
@@ -211,6 +213,8 @@ def run_getpos():
     if radec is not None:
         logging.debug(f'radec = {radec.to_string()}')
 
+    result_file.close()
+
     try:
         os.unlink(result_fname)
     except:
@@ -228,6 +232,9 @@ def run_findstars(curpos, args, lon=None):
     os.close(tmp_fd)
     result_fname = tmp_result_fname
     logging.debug(f'Using solution json tmp file {result_fname}')
+
+    import time
+    time.sleep(10)
 
     cmd_line = PYTHON_EXE_PATH + ' '
     if AUTOFOCUS_SCRIPT_PATH is not None:
@@ -303,6 +310,8 @@ def run_findstars(curpos, args, lon=None):
         star_list = None
 
     #logging.debug(f'star_list = {star_list}')
+
+    result_file.close()
 
     try:
         os.unlink(result_fname)
