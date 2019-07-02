@@ -98,7 +98,7 @@ def run_platesolve():
     tmp_fd, tmp_result_fname = tempfile.mkstemp(suffix='.json')
     os.close(tmp_fd)
     result_fname = tmp_result_fname
-    logging.debug(f'Using solvution json tmp file {result_fname}')
+    logging.debug(f'Using solution json tmp file {result_fname}')
 
     cmd_line = PYTHON_EXE_PATH + ' '
     script = 'pyastrometry_cli_main.py'
