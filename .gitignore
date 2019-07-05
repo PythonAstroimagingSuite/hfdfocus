@@ -1,6 +1,7 @@
 *~
 *.log
 *__pycache**
+*.mypy_cache
 *.fit
 *.fits
 *.py[cod]
