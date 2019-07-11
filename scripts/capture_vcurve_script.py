@@ -122,7 +122,7 @@ if __name__ == '__main__':
                 ax_1d = fig.add_subplot(122)
 
         # figure out direction
-        backlash = 200
+        backlash = 350
         logging.info(f'Shifting focus center by runoffset = {args.runoffset}')
         focus_low = int(focus_center+args.runoffset-focus_range/2)
         focus_high = focus_low + args.focus_range
@@ -214,14 +214,15 @@ if __name__ == '__main__':
                                                           bgfact=args.bgthres,
                                                           debugfits=True)
 
-                thres = bg + args.bgthres*mad
+                #thres = bg + args.bgthres*mad
+                thres = 10000
 
                 logging.info(f'Using thres = {thres}')
 
                 if np.max(starimage_data[starmask] > args.saturation):
                     logging.warning(f'SATURATED PIXELS DETECTED!')
 
-                win = 300
+                win = 200
                 xlow = max(0, int(xcen-win/2))
                 xhi = min(starimage_data.shape[0]-1, int(xcen+win/2))
                 ylow = max(0, int(ycen-win/2))
