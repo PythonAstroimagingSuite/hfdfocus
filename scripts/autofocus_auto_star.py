@@ -15,7 +15,8 @@ import tempfile
 from datetime import datetime
 
 from astropy import units as u
-from astropy.coordinates import Angle, SkyCoord
+from astropy.coordinates import SkyCoord
+from astropy.time import Time
 
 from pyastroprofile.AstroProfile import AstroProfile
 
@@ -462,6 +463,11 @@ def run_autofocus(args, extra_args):
 
     return True
 
+def get_altaz_from_radec(radec, observer, obstime):
+    altaz = observer.altaz(obstime, target=radec)
+    logging.debug(f'get_mount_altaz: computerd alt = {altaz.alt.degree}')
+    logging.debug(f'get_mount_altaz: computerd az  = {altaz.az.degree}')
+    return altaz.alt.degree, altaz.az.degree
 
 if __name__ == '__main__':
 
@@ -512,6 +518,9 @@ if __name__ == '__main__':
         #parser.add_argument('--noplatesolve', action='store_true', help='Just slew do not improve accuracy with plate solving')
         parser.add_argument('--preciseslewstar', action='store_true', help='Use precise slew to star')
         parser.add_argument('--preciseslewreturn', action='store_true', help='Use precise slew returning from star')
+        parser.add_argument('--nolower', type=float, default=None, help='How many degrees lower star can be')
+        parser.add_argument('--nolowerthres', type=float, default=None, help='Minimum altitude to enforce --nolower')
+        parser.add_argument('--nousehorizon', action='store_true', help='Ignore horizon in astroprofile when choosing stars')
 
         args, extra_args = parser.parse_known_args()
 
@@ -541,9 +550,11 @@ if __name__ == '__main__':
     # get astro profile if specified
     if args.profile is not None:
         logging.info(f'Using astro profile {args.profile}')
-        ap = AstroProfile()
-        ap.read(args.profile)
-        lon = ap.observatory.location.get('longitude', None)
+        astro_profile = AstroProfile()
+        astro_profile.read(args.profile)
+        lon = astro_profile.observatory.location.get('longitude', None)
+    else:
+        astro_profile = None
 
     # if just running autofocus here then get to it
     if args.focusonly:
@@ -587,10 +598,50 @@ if __name__ == '__main__':
         logging.error('No star candidate available!')
         sys.exit(1)
 
+    # MAX_NOLOWER_ALT sets an upper limit on the check for the focus star
+    # being at a higher altitude that current position.  Otherwise as the
+    # scope gets closer and closer to the zenith it would not be possible
+    # to find a higher star!
+    MAX_NOLOWER_ALT = 65
     result = None
     ntries = 0
     for sao, radec in star_list:
         logging.info(f'Trying SAO{sao} at {radec.to_string("hmsdms", sep=":")}')
+
+        # check alititude version current altitude if we have a location
+        if astro_profile is not None:
+            alt, az = get_altaz_from_radec(cur_radec,
+                                           astro_profile.observatory.observer,
+                                           Time.now())
+            logging.info(f'Current mount alt/az is {alt:3.1f} {az:4.1f}')
+            star_alt, star_az = get_altaz_from_radec(radec,
+                                                     astro_profile.observatory.observer,
+                                                     Time.now())
+            logging.info(f'Star alt/az is {star_alt:3.1f} {star_az:4.1f}')
+            logging.info(f'args.nousehorizon = {args.nousehorizon}')
+            if not args.nousehorizon:
+                logging.debug(f'Checking star against horizion definition')
+                hor_alt = astro_profile.observatory.horizon.get_alt(star_az)
+                logging.info(f'Horiizon alt at az={star_az:4.1f} is {hor_alt:3.1f} ')
+                if star_alt <= hor_alt:
+                    logging.info('Star is below horizon - skipping!')
+                    continue
+            logging.debug(f'args.nolower = {args.nolower}')
+            if args.nolower is not None:
+                logging.info(f'Checking alt of star')
+
+                logging.info(f'nolowerthres = {args.nolowerthres}')
+                logging.info(f'MAX_NOLOWER_ALT = {MAX_NOLOWER_ALT}')
+                if alt < MAX_NOLOWER_ALT and (args.nolowerthres is None or alt < args.nolowerthres):
+
+#                    star_alt, star_az = get_altaz_from_radec(radec,
+#                                                             astro_profile.observatory.observer,
+#                                                             Time.now())
+#                    logging.info(f'Star alt/az is {star_alt:3.1f} {star_az:4.1f}')
+
+                    if star_alt < alt:
+                        logging.info(f'Star SAO{sao} is below current position so skipping!')
+                        continue
 
         if args.preciseslewstar:
             slew_result = run_precise_slew(radec, args, extra_args)
