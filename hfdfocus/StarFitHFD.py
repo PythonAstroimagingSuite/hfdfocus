@@ -292,7 +292,7 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
         #print(bgrem_data[l].shape, npix)
 
         if npix < 9:
-            print('not enuf pix')
+            logging.warning('not enuf pix')
             continue
 
 #        if (bgrem_data[l] > satur).sum() > 0:

@@ -265,7 +265,7 @@ def run_findstars(curpos, args, lon=None):
     if args.meridianthres is not None:
         cmd_line += f' --meridianthres {args.meridianthres}'
 
-    print(cmd_line)
+    logging.debug(cmd_line)
 
     # unlink previous solve if any
     if os.path.isfile(result_fname):
