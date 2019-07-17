@@ -458,8 +458,8 @@ def run_autofocus(args, extra_args):
     logging.debug(f'autofocus rc = {rc}')
     if rc != 0:
         logging.error(f'run_autofocus: return code was {rc}!')
-        sys.exit(1)
-        return None
+        #sys.exit(1)
+        return False
 
     return True
 
@@ -521,6 +521,7 @@ if __name__ == '__main__':
         parser.add_argument('--nolower', type=float, default=None, help='How many degrees lower star can be')
         parser.add_argument('--nolowerthres', type=float, default=None, help='Minimum altitude to enforce --nolower')
         parser.add_argument('--nousehorizon', action='store_true', help='Ignore horizon in astroprofile when choosing stars')
+        parser.add_argument('--errorsimul', type=int, default=10, help='Randomly have autofocus fail for testing - give percentage fail rate')
 
         args, extra_args = parser.parse_known_args()
 
@@ -559,12 +560,15 @@ if __name__ == '__main__':
     # if just running autofocus here then get to it
     if args.focusonly:
         logging.info('Running autofocus without finding a focus star as requested.')
-        focus_result = run_autofocus(args, extra_args)
-        if focus_result:
-            logging.info('Autofocus successful!')
-            sys.exit(0)
-        else:
-            logging.error('Autofocus failed!')
+        retries = args.maxtries
+        while retries >= 0:
+            focus_result = run_autofocus(args, extra_args)
+            if focus_result:
+                logging.info('Autofocus successful!')
+                sys.exit(0)
+            else:
+                logging.error(f'Autofocus failed - {retries} retries left!')
+                retries = retries - 1
             sys.exit(1)
 
     # from here on down we are going to find a focus star, slew to it,
@@ -604,7 +608,7 @@ if __name__ == '__main__':
     # to find a higher star!
     MAX_NOLOWER_ALT = 65
     result = None
-    ntries = 0
+    stars_tried = 0
     for sao, radec in star_list:
         logging.info(f'Trying SAO{sao} at {radec.to_string("hmsdms", sep=":")}')
 
@@ -651,23 +655,39 @@ if __name__ == '__main__':
         logging.debug(f'slew_result = {slew_result}')
 
         if slew_result:
-            focus_result = run_autofocus(args, extra_args)
-            if not focus_result:
-                ntries += 1
-                if ntries <= args.maxtries:
-                    logging.error(f'Autofocus failed - trying next candidate (try {ntries} of {args.maxtries}!')
+            retries = args.maxtries
+            result = False
+            while retries >= 0:
+                focus_result = run_autofocus(args, extra_args)
+                if args.errorsimul is not None:
+                    import random
+                    if int(random.SystemRandom().random()*100) < args.errorsimul:
+                        logging.info('Simulating failure because of --simulerrors!')
+                        focus_result = False
+                if not focus_result:
+                    logging.error(f'Autofocus failed - {retries} retries left!')
+                    retries = retries - 1
+                    continue
                 else:
-                    logging.error(f'Autofocus failed - tried max {args.maxtgies} already - quitting!')
-                    sys.exit(1)
-                continue
-            else:
-                logging.info(f'Autofocus succeeded - result = {focus_result}')
-                result = focus_result
+                    logging.info(f'Autofocus succeeded - result = {focus_result}')
+                    result = focus_result
+                    break
+            if result:
+                # break out of loop over star candidates
                 break
-        else:
-            logging.error('Precise slew failed!')
+            stars_tried = stars_tried + 1
+            if stars_tried < 4:
+                logging.error(f'Autofocus failed - trying next candidate!')
+                continue
+            logging.error(f'Tried {stars_tried} stars unsuccessfully - quitting!')
             sys.exit(1)
-            continue
+        else:
+            stars_tried = stars_tried + 1
+            if stars_tried < 4:
+                logging.error(f'Precise slew failed - trying next candidate!')
+                continue
+            logging.error(f'Tried {stars_tried} stars unsuccessfully - quitting!')
+            sys.exit(1)
 
     if not result:
         logging.error('Could not autofocus sucessfully')
