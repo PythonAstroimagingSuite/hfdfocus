@@ -43,7 +43,7 @@ def parse_commandline():
     parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
     parser.add_argument('--saturation', default=55000, type=int,  help='Saturation level for sensor')
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
-    parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
+    parser.add_argument('--framesize', default=1000, type=int,  help='Size of capture frame, 0=full')
     parser.add_argument('--runoffset', default=0, type=int,  help='Shift center of run by this amount')
     parser.add_argument('--hfdcutoff', default=10, type=float,  help='Ignore points with HFD less than this value')
     parser.add_argument('--bgthres', default=50, type=int,  help='Threshold multiplier for star detection')
