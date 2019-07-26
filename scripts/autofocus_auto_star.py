@@ -7,6 +7,7 @@
 import os
 import sys
 import json
+import time
 import shlex
 import argparse
 import logging
@@ -492,6 +493,8 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
+    start_time = time.time()
+
     parser = argparse.ArgumentParser()
 #    parser.add_argument('focusmin', type=int, help='Min allowed focuser pos')
 #    parser.add_argument('focusmax', type=int, help='Max allowed focuser pos')
@@ -501,7 +504,7 @@ if __name__ == '__main__':
     parser.add_argument('--focusonly', action='store_true', help='Focus at current position - no slewing')
     parser.add_argument('--profile', type=str, help='Name of astro profile')
     parser.add_argument('--usedebugpaths', action='store_true', help='Run auxilary programs from checked out sources')
-
+    parser.add_argument('--maxtries', type=int, default=3, help='Number of tries before giving up')
     args, extra_args = parser.parse_known_args()
 
     # if not using focusonly then add in the rest of the args and reparse
@@ -513,8 +516,6 @@ if __name__ == '__main__':
         parser.add_argument('--lon', type=float, help='Location longitude')
         parser.add_argument('--meridianthres', type=str, default='00:30:00',
                             help='How close to meridian is allowed (hh:mm:ss)')
-        parser.add_argument('--maxtries', type=int, default=3,
-                            help='Number of stars to try before giving up')
         #parser.add_argument('--noplatesolve', action='store_true', help='Just slew do not improve accuracy with plate solving')
         parser.add_argument('--preciseslewstar', action='store_true', help='Use precise slew to star')
         parser.add_argument('--preciseslewreturn', action='store_true', help='Use precise slew returning from star')
@@ -693,6 +694,7 @@ if __name__ == '__main__':
         logging.error('Could not autofocus sucessfully')
     else:
         logging.info('Autofocus sucessful!')
+        logging.info(f'Autofocus auto star task took {time.time() - start_time} seconds')
 
     # return to original position
     logging.info(f'Returning to original position {cur_radec.to_string("hmsdms", sep=":")}')

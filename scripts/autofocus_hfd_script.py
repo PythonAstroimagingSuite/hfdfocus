@@ -276,6 +276,8 @@ if __name__ == '__main__':
     # initialize some variables
     backlash = 0
 
+    start_time = time.time()
+
     # connect focuser and camera
     if not args.simul or args.forcehw:
         # load profile
@@ -626,3 +628,5 @@ if __name__ == '__main__':
             plt.pause(5)
 
     cleanup_files()
+
+    logging.info(f'Focus run took {time.time() - start_time} seconds.')
