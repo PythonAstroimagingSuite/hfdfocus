@@ -522,7 +522,7 @@ if __name__ == '__main__':
         parser.add_argument('--nolower', type=float, default=None, help='How many degrees lower star can be')
         parser.add_argument('--nolowerthres', type=float, default=None, help='Minimum altitude to enforce --nolower')
         parser.add_argument('--nousehorizon', action='store_true', help='Ignore horizon in astroprofile when choosing stars')
-        parser.add_argument('--errorsimul', type=int, default=10, help='Randomly have autofocus fail for testing - give percentage fail rate')
+        parser.add_argument('--errorsimul', type=int, help='Randomly have autofocus fail for testing - give percentage fail rate')
 
         args, extra_args = parser.parse_known_args()
 
