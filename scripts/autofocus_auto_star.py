@@ -424,6 +424,7 @@ def run_autofocus(args, extra_args):
     parser.add_argument('--simuldatadir', type=str,  help='Location of simulated star data')
     parser.add_argument('--debugplots', action='store_true', help='Show plots')
     parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
+    parser.add_argument('--focusexposure', type=float, help='Focus exposure time')
     dev_args, unknown = parser.parse_known_args(sys.argv)
     logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
 
@@ -450,7 +451,9 @@ def run_autofocus(args, extra_args):
     if dev_args.focuser is not None:
         cmd_line += f'--focuser {json.dumps(dev_args.focuser)} '
     if dev_args.profile is not None:
-        cmd_line += f'--profile {dev_args.profile}'
+        cmd_line += f'--profile {dev_args.profile} '
+    if dev_args.focusexposure:
+        cmd_line += f'--exposure_start {dev_args.focusexposure}'
 
     logging.debug(f'run_autofocus cmd_line = {cmd_line}')
 

@@ -221,9 +221,9 @@ def parse_commandline():
     parser.add_argument('--profile', type=str, help='Name of equipment profile')
     parser.add_argument('--focuser', type=str,  help='Focuser Driver')
     parser.add_argument('--camera', type=str,  help='Camera Driver')
-    parser.add_argument('--exposure_start', default=1, type=int,  help='Starting exposure value')
-    parser.add_argument('--exposure_min', default=1, type=int,  help='Minimum exposure value')
-    parser.add_argument('--exposure_max', default=8, type=int,  help='Maximum exposure value')
+    parser.add_argument('--exposure_start', default=3, type=float,  help='Starting exposure value')
+    parser.add_argument('--exposure_min', default=1, type=float,  help='Minimum exposure value')
+    parser.add_argument('--exposure_max', default=8, type=float,  help='Maximum exposure value')
     parser.add_argument('--starflux_min', default=50000, type=int,  help='Maximum flux in star')
     parser.add_argument('--saturation', default=55000, type=int,  help='Saturation level for sensor')
     parser.add_argument('--framesize', default=800, type=int,  help='Size of capture frame, 0=full')
@@ -251,7 +251,8 @@ if __name__ == '__main__':
     logfilename = 'autofocus_hfd_script-' + now.strftime('%Y%m%d%H%M%S') + '.log'
 
 #    FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
-    FORMAT = '[%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+#    FORMAT = '[%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+    FORMAT = '%(asctime)s [%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
 
     logging.basicConfig(filename=logfilename,
                         filemode='a',
@@ -260,8 +261,10 @@ if __name__ == '__main__':
                         datefmt='%Y-%m-%d %H:%M:%S')
 
     # add to screen as well
+    CONSOLE_FORMAT = '[%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+
     log = logging.getLogger()
-    formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s ')
+    formatter = logging.Formatter(CONSOLE_FORMAT)
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
