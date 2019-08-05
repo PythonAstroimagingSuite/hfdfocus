@@ -478,9 +478,10 @@ if __name__ == '__main__':
 
         if hfd_1 is None:
             logging.error('No star found!')
-            if args.debugplots:
-                plt.show()
+            #if args.debugplots:
+            #    plt.show()
             cleanup_files()
+            logging.info('Exitting!')
             sys.exit(1)
 
         if args.debugplots:
@@ -499,11 +500,12 @@ if __name__ == '__main__':
 
         if hfd_2 is None:
             logging.error('No star found!')
-            if args.debugplots:
-                plt.show()
+            #if args.debugplots:
+            #    plt.show()
             if not args.simul or args.forcehw:
                 restore_focus_pos(starting_focus_pos)
             cleanup_files()
+            logging.info('Exitting!')
             sys.exit(1)
 
         logging.info(f'SECOND FOCUS = {fpos_2}  HFD = {hfd_2}')
@@ -577,11 +579,12 @@ if __name__ == '__main__':
 
     if hfd_near is None:
         logging.error('No star found!')
-        if args.debugplots:
-            plt.show()
+        #if args.debugplots:
+        #    plt.show()
         if not args.simul or args.forcehw:
             restore_focus_pos(starting_focus_pos)
         cleanup_files()
+        logging.info('Exitting!')
         sys.exit(1)
 
     logging.info(f'NEAR POSITION FOCUS = {fpos_near}  HFD = {hfd_near}')
@@ -611,11 +614,12 @@ if __name__ == '__main__':
 
         if best_hfd is None:
             logging.error('No star found!')
-            if args.debugplots:
-                plt.show()
+            #if args.debugplots:
+            #    plt.show()
             if not args.simul or args.forcehw:
                 restore_focus_pos(starting_focus_pos)
             cleanup_files()
+            logging.info('Exitting!')
             sys.exit(1)
 
         logging.info(f'BEST FOCUS POSITION = {fpos_best} HFD = {best_hfd}')
