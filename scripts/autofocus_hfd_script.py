@@ -252,12 +252,15 @@ if __name__ == '__main__':
 
 #    FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 #    FORMAT = '[%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
-    FORMAT = '%(asctime)s [%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+    #FORMAT = '%(asctime)s [%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+
+    LONG_FORMAT = '%(asctime)s.%(msecs)03d [%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+    SHORT_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
 
     logging.basicConfig(filename=logfilename,
                         filemode='a',
                         level=logging.DEBUG,
-                        format=FORMAT,
+                        format=LONG_FORMAT,
                         datefmt='%Y-%m-%d %H:%M:%S')
 
     # add to screen as well
