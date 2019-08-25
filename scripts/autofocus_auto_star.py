@@ -332,7 +332,7 @@ def run_precise_slew(target, args, extra_args):
     parser.add_argument('--mount', type=str, help='Name of mount driver')
     parser.add_argument('--camera', type=str, help='Name of camera driver')
     parser.add_argument('--exposure', type=float, default=5, help='Exposure time')
-    parser.add_argument('--binning', type=int, default=2, help='Camera binning')
+    parser.add_argument('--binning', type=int, help='Camera binning')
     parser.add_argument('--pixelscale', type=float, help='Pixel scale (arcsec/pixel)')
 #    parser.add_argument('--framesize', default=0, type=int,  help='Size of capture frame, 0=full')
     dev_args, unknown = parser.parse_known_args(sys.argv)
@@ -361,7 +361,8 @@ def run_precise_slew(target, args, extra_args):
     if dev_args.mount is not None:
         cmd_line += f'--mount {json.dumps(dev_args.mount)} '
     cmd_line += f'--exposure {dev_args.exposure} '
-    cmd_line += f'--binning {dev_args.binning} '
+    if dev_args.binning is not None:
+        cmd_line += f'--binning {dev_args.binning} '
     if dev_args.profile is not None:
         cmd_line += f'--profile {dev_args.profile}'
 
