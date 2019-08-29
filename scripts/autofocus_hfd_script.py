@@ -292,8 +292,11 @@ if __name__ == '__main__':
             ap = AstroProfile()
             ap.read(args.profile)
             logging.debug(f'profile = {ap.equipment}')
+            backend_name = ap.equipment.backend.get('name')
             camera_driver = ap.equipment.camera.driver
             #print(dir(ap.equipment.focuser))
+            logging.debug(f'ap.equipment.backend = {ap.equipment.backend}')
+            logging.debug(f'ap.equipment.camera = {ap.equipment.camera}')
             logging.debug(f'ap.equipment.focuser = {ap.equipment.focuser}')
             logging.debug(f'ap.settings.autofocus = {ap.settings.autofocus}')
             focuser_driver = ap.equipment.focuser.get('driver')
@@ -325,10 +328,11 @@ if __name__ == '__main__':
             start_hfd = args.start_hfd
             near_hfd = args.near_hfd
             backlash = args.backlash
+            backend_name = None
 
         sdi = SDI()
 
-        sdi.connect_backend()
+        sdi.connect_backend(backend_name)
 
         #focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
         logging.debug(f'Connecting to focuser driver {focuser_driver}')
