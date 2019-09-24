@@ -1,9 +1,19 @@
+# try to disable requests logging DEBUG
+import requests
+import logging
+
+
+for key in logging.Logger.manager.loggerDict:
+    #print(key)
+    logging.getLogger(key).setLevel(logging.CRITICAL)
+
+
 import os
 import sys
 import time
 import json
 import argparse
-import logging
+from datetime import datetime
 
 import astropy.io.fits as pyfits
 
@@ -36,6 +46,7 @@ def parse_commandline():
     parser.add_argument('nruns', type=int, help='Number of vcurve runs')
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
     parser.add_argument('--simul', action='store_true', help='Simulate star')
+    parser.add_argument('--backend', type=str,  help='Backend')
     parser.add_argument('--focuser_driver', type=str,  help='Focuser Driver')
     parser.add_argument('--camera_driver', type=str,  help='Camera Driver')
     parser.add_argument('--exposure_start', default=1, type=int,  help='Starting exposure value')
@@ -47,11 +58,17 @@ def parse_commandline():
     parser.add_argument('--runoffset', default=0, type=int,  help='Shift center of run by this amount')
     parser.add_argument('--hfdcutoff', default=10, type=float,  help='Ignore points with HFD less than this value')
     parser.add_argument('--bgthres', default=50, type=int,  help='Threshold multiplier for star detection')
+    parser.add_argument('--movedelay', default=0, type=float,  help='Delay in seconds between moves')
 
     return parser.parse_args()
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='sample_vcurve.log',
+
+    log_timestamp = datetime.now()
+    logfilename = 'capture_vcurve_script-' + log_timestamp.strftime('%Y%m%d%H%M%S') + '.log'
+
+
+    logging.basicConfig(filename=logfilename,
                         filemode='w',
                         level=logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s',
@@ -73,7 +90,7 @@ if __name__ == '__main__':
         from pyastrobackend.SimpleDeviceInterface import SimpleDeviceInterface as SDI
         sdi = SDI()
 
-        sdi.connect_backend()
+        sdi.connect_backend(args.backend)
 
         #focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
         logging.info(f'Connecting to focuser driver {args.focuser_driver}')
@@ -165,6 +182,10 @@ if __name__ == '__main__':
                         sys.exit(1)
 
                     sdi.wait_on_focuser_move(focuser)
+
+                    if args.movedelay > 0:
+                        logging.info(f'movedelay {args.movedelay} seconds')
+                        time.sleep(args.movedelay)
 
                     # NOTE roi in INDI not working for some reason (EKOS overriding?)
                     # just take full frame then shrink
@@ -286,14 +307,8 @@ if __name__ == '__main__':
                     ax_1d.set_title(f'{hfr-hfl:5.3f} {alone}')
                 #print('drawing plot')
                 fig.show()
-                plt.pause(2)
+                #plt.pause(2)
                 #plt.show()
-
-        # write out
-        f = open(os.path.join(imagesdir, f'hfd_run_{iter+1:03d}.txt'), 'w')
-        for (ls, lp, rs, rp)  in fit_arr:
-            f.write(f'{ls}, {lp}, {rs}, {rp}\n')
-        f.close()
 
         # fit
         fpos_arr = np.array(fpos_arr)
@@ -376,6 +391,12 @@ if __name__ == '__main__':
         j = json.dumps({ 'timestamp' : tstamp, 'rightslope' : rs, 'rightpid' : rp, 'leftslope' : ls, 'leftpid' : lp})
         f.write(j + '\n')
         f.close()
+
+    # write out
+    f = open(os.path.join(imagesdir, f'hfd_run_{iter+1:03d}.txt'), 'w')
+    for (ls, lp, rs, rp)  in fit_arr:
+        f.write(f'{ls}, {lp}, {rs}, {rp}\n')
+    f.close()
 
     if args.debugplots:
         plt.show()

@@ -302,7 +302,12 @@ def run_findstars(curpos, args, lon=None):
 
             catidx, distdeg, sao, rastr, decstr, vmag, nneigh = l.strip().split(',')
             target_str = rastr + " " + decstr
-            logging.debug(f"star target_str = {target_str}")
+            logging.debug(f"star sao = {sao} target_str = {target_str}")
+
+            # FIXME blacklist
+            if int(sao) == 20554:
+                logging.warning(f'Ignoring SAO {sao} on blacklist')
+
             radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
                               frame='fk5', equinox='J2000')
             star_list.append((sao, radec))
