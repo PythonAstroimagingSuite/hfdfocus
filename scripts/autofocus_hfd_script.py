@@ -1,6 +1,6 @@
 import os
 import sys
-import glob
+import math
 import time
 import argparse
 import logging
@@ -55,11 +55,18 @@ def measure_frame(starimage_data):
     bg = 800
     thres = 10000
 
-    xcen, ycen, bg, mad, starmask, alone = find_star(starimage_data, debugfits=False)
+    rc_find = find_star(starimage_data, debugfits=False)
+
+    if rc_find is None:
+        logging.error('measure_frame: find_star failed!')
+        return None
+
+    xcen, ycen, bg, mad, starmask, alon = rc_find
 
     satur = False
+    logging.info(f'Star Max Pixel Value = {np.max(starimage_data[starmask])}')
     if np.max(starimage_data[starmask] > args.saturation):
-        logging.warning(f'SATURATED PIXELS DETECTED!')
+        logging.warning(f'SATURATED PIXELS DETECTED! Value = {np.max(starimage_data[starmask])}')
         satur = True
 
     win = args.winsize
@@ -87,7 +94,7 @@ def measure_frame(starimage_data):
 
     if rc is not None:
         scen, sl, sr, hfl, hfr, totflux = rc
-        return hfr-hfl, satur
+        return hfr-hfl, satur, rc
     else:
         return None
 
@@ -165,11 +172,14 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
     for i in range(0, niter):
         imgname = os.path.join(IMAGESDIR, f'vcurve_focuspos_{tag}{i:02d}_{fpos}.fit')
         if not args.simul:
-            hfd, satur = take_exposure_and_measure_star(imgname, focus_expos)
+            rc_focus = take_exposure_and_measure_star(imgname, focus_expos)
+            if rc_focus is None:
+                return None
+            hfd, satur, focus_result = rc_focus
         else:
             tmp_starimage_data = simul_star.get_simul_star_image(fpos)
             pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-            hfd, satur= measure_frame(tmp_starimage_data)
+            hfd, satur, focus_result = measure_frame(tmp_starimage_data)
 
         if hfd is None:
             logging.error('No star found - continuing!')
@@ -191,6 +201,120 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
         return avg_hfd/ncap
     else:
         return None
+
+def determine_final_hfd(fpos_best, best_expos):
+    best_tries = 0
+    s_max = 1.0
+    s_min = 0.01
+    first = True
+    final_hfd = None
+    while True:
+        s_fact = (s_max + s_min)/2
+        logging.info(f'scale min/max/cur: {s_min} {s_max} {s_fact}')
+        rc = measure_at_focus_pos(fpos_best, s_fact*best_expos)
+        if rc is None:
+            if first:
+                return None
+#                logging.error('No star found!')
+#                if not args.simul or args.forcehw:
+#                    restore_focus_pos(starting_focus_pos)
+#                cleanup_files()
+#                logging.info('Exitting!')
+#                sys.exit(1)
+
+            logging.error(f'Measurement failed!')
+            logging.warning(f'Setting s_min to {s_fact}')
+            s_min = s_fact
+        else:
+            # show result
+            if args.debugplots:
+                plt.pause(0.05)
+
+            best_hfd, satur, fresult = rc
+            scen, sl, sr, hfl, hfr, totflux = fresult
+            logging.info(f'Flux  : {totflux}')
+            logging.info(f'HFD   : {best_hfd}')
+            logging.info(f'Satur : {satur}')
+
+            if not satur:
+                final_hfd = best_hfd
+                break
+            else:
+                logging.warning(f'Saturated setting s_max to {s_fact}')
+                s_max = s_fact
+
+            first = False
+
+        best_tries += 1
+        if best_tries > 5:
+            logging.error(f'Unble to take best focus exposure after {best_tries-1} tries!.')
+            break
+
+    return final_hfd
+
+
+def measure_file_only(image_file, debug_scale_factor=1.0):
+    m_hdu = pyfits.open(image_file)
+    m_starimage_data = m_hdu[0].data.astype(float)
+    m_hdu.close()
+    m_med = np.median(m_starimage_data)
+
+    rc = measure_frame(m_starimage_data)
+    logging.info(f'Measure frame for {args.measurefile} returned {rc}')
+    if rc is not None:
+        hfd, satur, fresult = rc
+        scen, sl, sr, hfl, hfr, totflux = fresult
+        logging.info(f'Measurement report:')
+        logging.info(f'Median: {m_med}')
+        logging.info(f'Flux  : {totflux}')
+        logging.info(f'HFD   : {hfd}')
+    else:
+        logging.error(f'Measurement failed!')
+        return False
+    return True
+
+def test_exposure_scaling(image_file):
+    m_hdu = pyfits.open(image_file)
+    m_starimage_data = m_hdu[0].data.astype(float)
+    m_hdu.close()
+    m_med = np.median(m_starimage_data)
+
+    #
+    # testing - simulate more/less exposure
+    #
+    # guess based on ONTC focused frames
+    s_min = 0.01
+    s_max = 16.0
+    e_min = 0.1
+    while True:
+        scale_factor = (s_min+s_max)/2
+
+        s_starimage_data = (m_starimage_data-m_med)*scale_factor + m_med
+
+        rc = measure_frame(s_starimage_data)
+        logging.info(f'Measure frame for {args.measurefile} returned {rc}')
+        logging.info(f'Measurement report:')
+        logging.info(f'Scale Factor: {s_min} {s_max} {scale_factor}')
+        logging.info(f'Median: {m_med}')
+
+        if rc is not None:
+            hfd, satur, fresult = rc
+            scen, sl, sr, hfl, hfr, totflux = fresult
+
+            logging.info(f'Flux  : {totflux}')
+            logging.info(f'HFD   : {hfd}')
+            logging.info(f'Flux/PI/HFD^2/4: {totflux/hfd/hfd/math.pi/4}')
+
+            if not satur:
+                return True
+            else:
+                logging.warning(f'Saturated setting s_max to {scale_factor}')
+                s_max = scale_factor
+        else:
+            logging.error(f'Measurement failed!')
+            logging.warning(f'Setting s_min to {scale_factor}')
+            s_min = scale_factor
+
 
 def cleanup_files():
     logging.info(f'Cleaning up temp dir {IMAGESDIROBJ}')
@@ -249,6 +373,8 @@ def parse_commandline():
     parser.add_argument('--backlash', type=float, default=0, help='Steps of backlash')
     parser.add_argument('--forcehw', action='store_true', help='Force connecting to hw in simul mode')
     parser.add_argument('--keepfiles', action='store_true', help='Keep images taken during focusing')
+    parser.add_argument('--measurefile', type=str,  help='Measure file and exit')
+    parser.add_argument('--testfinal', action='store_true', help='Test final HFD determination')
 
     args = parser.parse_args()
     return args
@@ -287,6 +413,14 @@ if __name__ == '__main__':
 
     if args.debug:
         ch.setLevel(logging.DEBUG)
+
+    if args.measurefile is not None:
+        #rc = measure_file_only(args.measurefile)
+        rc = test_exposure_scaling(args.measurefile)
+        if rc:
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
     # initialize some variables
     backlash = 0
@@ -451,8 +585,6 @@ if __name__ == '__main__':
         plt.pause(0.01)
 
     # save initial focus position
-
-
     focus_expos = args.exposure_start
     logging.info(f'Starting exposure is {focus_expos} seconds')
 
@@ -471,6 +603,13 @@ if __name__ == '__main__':
             fpos_1 = 8000
     else:
         fpos_1 = args.focus_start
+
+    # test code just measure HFD and adjust exposure
+    # so it is not saturated
+    if args.testfinal:
+        final_hfd = determine_final_hfd(fpos_1, focus_expos)
+        logging.info(f'Final HFD = {final_hfd}')
+        sys.exit(0)
 
     # save starting position for if we need to restore
     starting_focus_pos = fpos_1
@@ -491,7 +630,11 @@ if __name__ == '__main__':
     ntries = 0
     right_side = False
     while ntries < 3:
-        hfd_1, satur = measure_at_focus_pos(fpos_1, focus_expos)
+        rc_fpos1 = measure_at_focus_pos(fpos_1, focus_expos)
+        if rc_fpos1 is None:
+            hfd_1 = None
+        else:
+            hfd_1, satur, freturn = rc_fpos1
 
         if hfd_1 is None:
             logging.error('No star found!')
@@ -513,7 +656,11 @@ if __name__ == '__main__':
         nsteps = int(abs(10/vslope))
         fpos_2 = fpos_1 - fdir*nsteps
 
-        hfd_2, satur = measure_at_focus_pos(fpos_2, focus_expos)
+        rc_fpos2 = measure_at_focus_pos(fpos_2, focus_expos)
+        if rc_fpos2 is None:
+            hfd_2 = None
+        else:
+            hfd_2, satur, freturn = rc_fpos2
 
         if hfd_2 is None:
             logging.error('No star found!')
@@ -589,10 +736,28 @@ if __name__ == '__main__':
     # now based on average at start compute near HFD location
     # compute location for desired start HFD
     #inner_hfd = 12
-    fpos_near = fpos_start + fdir*int(abs((near_hfd-avg_start_hfd)/vslope))
-    logging.info(f'Near HFD = {near_hfd} pred focus = {fpos_near}')
 
-    hfd_near, satur = measure_at_focus_pos(fpos_near, focus_expos)
+    if avg_start_hfd is not None:
+        fpos_near = fpos_start + fdir*int(abs((near_hfd-avg_start_hfd)/vslope))
+        logging.info(f'Near HFD = {near_hfd} pred focus = {fpos_near}')
+    else:
+        fpos_near = None
+
+    if fpos_near is None:
+        logging.error('Near HFD - No star found!')
+        #if args.debugplots:
+        #    plt.show()
+        if not args.simul or args.forcehw:
+            restore_focus_pos(starting_focus_pos)
+        cleanup_files()
+        logging.info('Exitting!')
+        sys.exit(1)
+
+    rc_near = measure_at_focus_pos(fpos_near, focus_expos)
+    if rc_near is None:
+        hfd_near = None
+    else:
+        hfd_near, satur, freturn = rc_near
 
     if hfd_near is None:
         logging.error('No star found!')
@@ -618,7 +783,10 @@ if __name__ == '__main__':
     logging.info(f'NEAR POSITION FOCUS AVERAGE HFD = {avg_near_hfd}')
 
     # now compute best focus
-    fpos_best = int(fpos_near + fdir*int(abs(avg_near_hfd/vslope)) + vpid)
+    if avg_near_hfd is not None:
+        fpos_best = int(fpos_near + fdir*int(abs(avg_near_hfd/vslope)) + vpid)
+    else:
+        fpos_best = None
 
     logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_near} {int(avg_near_hfd/vslope)} {vpid}')
 
@@ -627,31 +795,23 @@ if __name__ == '__main__':
         logging.error(f'Best focus position {fpos_best} is outside allowed range {FOCUSER_MIN_POS} to {FOCUSER_MAX_POS}')
         restore_focus_pos(starting_focus_pos)
     else:
-        best_expos = focus_expos
-        best_tries = 0
-        while True:
-            best_hfd, satur = measure_at_focus_pos(fpos_best, best_expos)
-
-            if best_hfd is None:
-                logging.error('No star found!')
-                #if args.debugplots:
-                #    plt.show()
-                if not args.simul or args.forcehw:
-                    restore_focus_pos(starting_focus_pos)
-                cleanup_files()
-                logging.info('Exitting!')
-                sys.exit(1)
-
-            if not satur:
+        tries = 0
+        best_hfd = None
+        while tries < 4:
+            final_hfd = determine_final_hfd(fpos_best, focus_expos)
+            logging.info(f'Final HFD = {final_hfd}')
+            if final_hfd is not None:
+                best_hfd = final_hfd
                 break
+            tries += 1
 
-            best_tries += 1
-            if best_tries > 5:
-                logging.error(f'Unble to take best focus exposure after {best_tries-1} tries!.')
-                break
-
-            best_expos = 0.25*best_expos
-            logging.info(f'exposure saturated - trying {best_expos}')
+        if best_hfd is None:
+            logging.error('Could not determine final HFD!')
+            if not args.simul or args.forcehw:
+                restore_focus_pos(starting_focus_pos)
+            cleanup_files()
+            logging.info('Exitting!')
+            sys.exit(1)
 
         logging.info(f'BEST FOCUS POSITION = {fpos_best} HFD = {best_hfd}')
 

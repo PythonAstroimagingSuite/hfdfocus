@@ -574,14 +574,18 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     #print(f'flux2_vs_r, r = {flux2_vs_r} {r_arr}')
 
     # make inverse function of r vs flux to find half flux
-    flux_inv = interp1d(flux2_vs_r, r_arr)
+    try:
+        flux_inv = interp1d(flux2_vs_r, r_arr)
 
-    # uncomment to see raw profile
-    if debugplots:
-        ax_3.plot(r_arr, flux2_vs_r)
-    #plt.show()
+        # uncomment to see raw profile
+        if debugplots:
+            ax_3.plot(r_arr, flux2_vs_r)
+        #plt.show()
 
-    half_flux_r = flux_inv(totflux/2)
+        half_flux_r = flux_inv(totflux/2)
+    except:
+        logging.error('Error finding half flux rad!', exc_info=True)
+        return None
 
     logging.debug(f'half flux rad = {half_flux_r}')
     #print(r_arr)
