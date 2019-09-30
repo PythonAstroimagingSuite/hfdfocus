@@ -10,7 +10,7 @@ import astropy.io.fits as pyfits
 # for testing
 import matplotlib.pyplot as plt
 
-from StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
+from hfdfocus.StarFitHFD import find_hfd_from_1D, find_star, horiz_bin_window
 
 
 if __name__ == '__main__':
@@ -37,11 +37,11 @@ if __name__ == '__main__':
 
 #    logging.info(f'command args = {args}')
 
-    imgfiles = glob.glob(os.path.join(args.imgdir, '*.fit'))
+    imgfiles = glob.glob(os.path.join(args.imgdir, '*.fits'))
 
     logging.info(f'imgfiles = {imgfiles}')
 
-    focus_re = re.compile('^.*focuspos_(?P<pos>\d{2,}).fit$')
+    focus_re = re.compile('^.*focus_(?P<pos>\d{2,}).fits$')
 
     for infile in sorted(imgfiles):
 
