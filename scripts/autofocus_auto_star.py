@@ -305,8 +305,9 @@ def run_findstars(curpos, args, lon=None):
             logging.debug(f"star sao = {sao} target_str = {target_str}")
 
             # FIXME blacklist
-            if int(sao) == 20554:
+            if int(sao) in [20554, 49482]:
                 logging.warning(f'Ignoring SAO {sao} on blacklist')
+                continue
 
             radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
                               frame='fk5', equinox='J2000')

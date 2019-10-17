@@ -13,7 +13,8 @@ import numpy as np
 #from scipy.stats import siegelslopes
 
 import matplotlib as mpl
-mpl.use("Qt5agg")
+#mpl.use("Qt5agg")
+mpl.use("TkAgg")
 mpl.rcParams['toolbar'] = 'None'
 mpl.rc('font', size=8)
 import matplotlib.pyplot as plt
@@ -90,10 +91,14 @@ def measure_frame(starimage_data):
     if args.debugplots:
         ax_1d.plot(profile)
 
-    rc = find_hfd_from_1D(profile, thres=thres)
+    rc = find_hfd_from_1D(profile, thres=thres, debugplots=False)
 
     if rc is not None:
         scen, sl, sr, hfl, hfr, totflux = rc
+        if args.debugplots:
+            hfw = 2*(hfr-hfl)
+            hfc = (hfr+hfl)/2
+            ax_1d.set_xlim(hfc-hfw, hfc+hfw)
         return hfr-hfl, satur, rc
     else:
         return None
@@ -150,13 +155,28 @@ def measure_at_focus_pos(fpos, focus_expos):
             move_focuser(fpos)
             time.sleep(args.focusdelay)
 
-    imgname = os.path.join(IMAGESDIR, f'vcurve_focuspos_{fpos}.fit')
-    if not args.simul:
-        rc = take_exposure_and_measure_star(imgname, focus_expos)
-    else:
-        tmp_starimage_data = simul_star.get_simul_star_image(fpos)
-        pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
-        rc = measure_frame(tmp_starimage_data)
+    use_expos = focus_expos
+    for i in range(0, 4):
+
+        imgname = os.path.join(IMAGESDIR, f'vcurve_focuspos_{fpos}.fit')
+        if not args.simul:
+            rc = take_exposure_and_measure_star(imgname, use_expos)
+        else:
+            tmp_starimage_data = simul_star.get_simul_star_image(fpos)
+            pyfits.writeto(imgname, tmp_starimage_data.astype(float), overwrite=True)
+            rc = measure_frame(tmp_starimage_data)
+
+        if rc is None:
+            use_expos *= 2
+            logging.info(f'No star - bumping exposusure to {use_expos}')
+        else:
+            satur = rc[1]  # hfr-hfl, satur, rc
+            if satur:
+                use_expos /= 2
+                logging.info(f'Saturated star - dropping exposusure to {use_expos}')
+            else:
+                break
+
 
     return rc
 
@@ -236,6 +256,16 @@ def determine_final_hfd(fpos_best, best_expos):
             logging.info(f'HFD   : {best_hfd}')
             logging.info(f'Satur : {satur}')
 
+            final_hfd = best_hfd
+
+            if args.debugplots:
+                if satur:
+                    s_str = 'SATUR'
+                else:
+                    s_str = 'UNSAT'
+                fig.suptitle(f'Test best focus {fpos_best} HFD {best_hfd:5.2f} {s_str}')
+                plt.pause(0.05)
+
             if not satur:
                 final_hfd = best_hfd
                 break
@@ -250,7 +280,7 @@ def determine_final_hfd(fpos_best, best_expos):
             logging.error(f'Unble to take best focus exposure after {best_tries-1} tries!.')
             break
 
-    return final_hfd
+    return final_hfd, satur
 
 
 def measure_file_only(image_file, debug_scale_factor=1.0):
@@ -414,9 +444,26 @@ if __name__ == '__main__':
     if args.debug:
         ch.setLevel(logging.DEBUG)
 
+    # create plots if needed
+    if args.debugplots:
+        logging.debug('Creating figure')
+#        fig2 = plt.figure()
+#        ax_hfd = fig2.add_subplot(111)
+#        hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
+        fig = plt.figure(figsize=(4.5,2))
+        ax_1d = fig.add_subplot(121)
+        ax_2d = fig.add_subplot(122)
+        plt.pause(0.01)
+
     if args.measurefile is not None:
-        #rc = measure_file_only(args.measurefile)
-        rc = test_exposure_scaling(args.measurefile)
+        rc = measure_file_only(args.measurefile)
+        #rc = test_exposure_scaling(args.measurefile)
+        # keep plots up until keypress
+        if args.debugplots:
+            if args.stayopen:
+                plt.show()
+            else:
+                plt.pause(args.debugplotsdelay)
         if rc:
             sys.exit(0)
         else:
@@ -572,17 +619,6 @@ if __name__ == '__main__':
 
     #IMAGESDIR = datestr
     #os.mkdir(IMAGESDIR)
-
-    # create plots if needed
-    if args.debugplots:
-        logging.debug('Creating figure')
-#        fig2 = plt.figure()
-#        ax_hfd = fig2.add_subplot(111)
-#        hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
-        fig = plt.figure(figsize=(4.5,2))
-        ax_1d = fig.add_subplot(121)
-        ax_2d = fig.add_subplot(122)
-        plt.pause(0.01)
 
     # save initial focus position
     focus_expos = args.exposure_start
@@ -797,26 +833,36 @@ if __name__ == '__main__':
     else:
         tries = 0
         best_hfd = None
-        while tries < 4:
-            final_hfd = determine_final_hfd(fpos_best, focus_expos)
-            logging.info(f'Final HFD = {final_hfd}')
-            if final_hfd is not None:
-                best_hfd = final_hfd
-                break
-            tries += 1
+        # old method tried several times - not doing this for now
+        # while tries < 4:
+            # final_hfd, satur = determine_final_hfd(fpos_best, focus_expos)
+            # logging.info(f'Final HFD = {final_hfd}')
+            # if final_hfd is not None:
+                # best_hfd = final_hfd
+                # break
+            # tries += 1
+
+        # just try once for now
+        # try to get autoexposed non-saturated star profile and measure
+        best_hfd, satur = determine_final_hfd(fpos_best, focus_expos)
+        logging.info(f'Best HFD = {best_hfd}')
 
         if best_hfd is None:
             logging.error('Could not determine final HFD!')
-            if not args.simul or args.forcehw:
-                restore_focus_pos(starting_focus_pos)
-            cleanup_files()
-            logging.info('Exitting!')
-            sys.exit(1)
+            #if not args.simul or args.forcehw:
+            #    restore_focus_pos(starting_focus_pos)
+            #cleanup_files()
+            #logging.info('Exitting!')
+            #sys.exit(1)
+        else:
+            logging.info(f'BEST FOCUS POSITION = {fpos_best} HFD = {best_hfd}')
 
-        logging.info(f'BEST FOCUS POSITION = {fpos_best} HFD = {best_hfd}')
-
-        if args.debugplots:
-            fig.suptitle(f'Best pos focus {fpos_best} HFD {best_hfd:5.2f}')
+            if args.debugplots:
+                if satur:
+                    s_str = 'SATUR'
+                else:
+                    s_str = 'UNSAT'
+                fig.suptitle(f'Best pos focus {fpos_best} HFD {best_hfd:5.2f} {s_str}')
 
     # keep plots up until keypress
     if args.debugplots:
@@ -828,3 +874,11 @@ if __name__ == '__main__':
     cleanup_files()
 
     logging.info(f'Focus run took {time.time() - start_time} seconds.')
+
+    if args.debugplots:
+        plt.close('all')
+
+    logging.info('Returning with rc of 0')
+    #sys.exit(0)
+    os._exit(0)
+

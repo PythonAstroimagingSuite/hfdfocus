@@ -307,7 +307,7 @@ if __name__ == '__main__':
                     ax_1d.set_title(f'{hfr-hfl:5.3f} {alone}')
                 #print('drawing plot')
                 fig.show()
-                #plt.pause(2)
+                plt.pause(0.05)
                 #plt.show()
 
         # fit

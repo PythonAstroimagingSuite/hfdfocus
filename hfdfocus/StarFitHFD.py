@@ -403,7 +403,7 @@ def horiz_bin_window(data, bg=0):
     return profile
 
 # find left/right limits of star disk
-def find_star_limits_robust(profile, thres=0):
+def find_star_limits_robust_from_edges(profile, thres=0):
     """
     Given a 1D star profile search to right and left of peak for edges of profile.
 
@@ -438,6 +438,102 @@ def find_star_limits_robust(profile, thres=0):
         idx -= 1
 
     return left, right
+
+# find left/right limits of star disk
+# start from center of profile
+def find_star_limits_robust_from_center(profile, thres=0):
+    """
+    Given a 1D star profile search to right and left of peak for edges of profile.
+
+    :param profile: 1D star profile (numpy array)
+    :param thres: Ignore all pixels below this value.
+    :returns:
+        Tuple containing index for left and right extremes of star profile.
+        Left limit is FIRST pixel to left of 'star' BELOW thres
+        Right limit is LAST pixel to right of 'star' ABOVE thres
+    :rtype: (int, int)
+    """
+    # search from left side (idx=0) for first pixel over thres
+    #idx = np.where(profile > thres)[0]
+
+    #assume 'peak' is in center of profile
+
+    left = None
+    right = None
+
+    # check to left first
+    #logging.debug('Finding left')
+    idx = int(len(profile)/2)
+    while idx > 1:
+        #logging.debug(f'{idx} {thres} {profile[idx]} {profile[idx-1]}')
+        if profile[idx] >= thres and profile[idx-1] < thres:
+            left = idx-1
+            break
+        idx -= 1
+
+    if left is None:
+        return None, None
+
+    idx = int(len(profile)/2)
+    #logging.debug('Finding right')
+    while idx < len(profile)-2:
+        #logging.debug(f'{idx} {thres} {profile[idx]} {profile[idx+1]}')
+        if profile[idx] >= thres and profile[idx+1] < thres:
+            right = idx
+            break
+        idx += 1
+
+    return left, right
+
+# find left/right limits of star disk
+# start from center of profile
+def find_star_limits_robust_from_max_region(profile, thres=0):
+    """
+    Given a 1D star profile search to right and left of peak for edges of profile.
+
+    :param profile: 1D star profile (numpy array)
+    :param thres: Ignore all pixels below this value.
+    :returns:
+        Tuple containing index for left and right extremes of star profile.
+        Left limit is FIRST pixel to left of 'star' BELOW thres
+        Right limit is LAST pixel to right of 'star' ABOVE thres
+    :rtype: (int, int)
+    """
+    # search from left side (idx=0) for first pixel over thres
+    #idx = np.where(profile > thres)[0]
+
+    #assume 'peak' is in center of profile
+
+    left = None
+    right = None
+
+    from scipy.ndimage import find_objects, label
+    profile_arr = np.array(profile)
+    profile_thres = (profile_arr > thres).astype(int)
+    logging.debug(f'profile_thres = {profile_thres}')
+    profile_label, label_count = label(profile_thres)
+    reg = find_objects(profile_label)
+    logging.debug(f'region = {reg}')
+
+    if reg is None:
+        return None, None
+
+    maxreg = None
+    maxsum = 0
+    for a in reg:
+        rsum = np.sum(profile[a])
+        logging.debug(f'{a[0].start} {a[0].stop} {rsum}')
+        if rsum > maxsum:
+            maxreg = a[0]
+            maxsum = rsum
+
+    logging.debug(f'max region {maxreg.start} {maxreg.stop} {maxsum}')
+
+    left = maxreg.start-1
+    right = maxreg.stop-1
+
+    return left, right
+
 
 # more robust find left/right limits of star disk
 def find_star_limits(profile, thres=0):
@@ -491,8 +587,12 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     #print(idx)
 
     #lidx, ridx = find_star_limits(profile, thres)
-    lidx, ridx = find_star_limits_robust(profile, thres)
-    logging.debug(f'left, right = {lidx}, {ridx}')
+    lidx, ridx = find_star_limits_robust_from_edges(profile, thres)
+    logging.debug(f'from edge left, right = {lidx}, {ridx}')
+    lidx, ridx = find_star_limits_robust_from_center(profile, thres)
+    logging.debug(f'from center left, right = {lidx}, {ridx}')
+    lidx, ridx = find_star_limits_robust_from_max_region(profile, thres)
+    logging.debug(f'from max region left, right = {lidx}, {ridx}')
     if lidx is None or ridx is None:
         return None
 
@@ -594,6 +694,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     #ax_3.plot(r_arr, flux_vs_r)
     if debugplots:
         ax_3.axvline(half_flux_r, color='green')
+        #plt.pause(15)
 
     return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r, totflux)
 
@@ -684,8 +785,8 @@ def test_1d_with_gaussian():
 
     profile = horiz_bin_window(z, bg=bg)
 
-    print('thres = ', thres)
-    print('profile = ', profile)
+    #print('thres = ', thres)
+    #print('profile = ', profile)
 
     scen, sl, sr = find_hfd_from_1D(profile, thres=thres)
 
@@ -696,7 +797,7 @@ def test_1d_with_gaussian():
         ax_1d.axvline(sl, color='green')
         ax_1d.axvline(sr, color='green')
 
-    print('total counts = ', np.sum(z-bg))
+    #print('total counts = ', np.sum(z-bg))
 
     plt.show()
 
