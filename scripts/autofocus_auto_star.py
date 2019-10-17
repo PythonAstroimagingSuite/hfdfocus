@@ -514,6 +514,7 @@ if __name__ == '__main__':
 #    parser.add_argument('focusdir', type=str, help='Focus IN or OUT')
 
     # see if focusonly is present and get the minimum args we need
+    parser.add_argument('--slewonly', action='store_true', help='Find and slew to an appropriate star but no focusing')
     parser.add_argument('--focusonly', action='store_true', help='Focus at current position - no slewing')
     parser.add_argument('--profile', type=str, help='Name of astro profile')
     parser.add_argument('--usedebugpaths', action='store_true', help='Run auxilary programs from checked out sources')
@@ -669,6 +670,10 @@ if __name__ == '__main__':
         logging.debug(f'slew_result = {slew_result}')
 
         if slew_result:
+            if args.slewonly:
+                logging.info('Option --slewonly was given so exitting after slew without focusing')
+                sys.exit(0)
+
             retries = args.maxtries
             result = False
             while retries >= 0:

@@ -96,9 +96,19 @@ def measure_frame(starimage_data):
     if rc is not None:
         scen, sl, sr, hfl, hfr, totflux = rc
         if args.debugplots:
-            hfw = 2*(hfr-hfl)
-            hfc = (hfr+hfl)/2
-            ax_1d.set_xlim(hfc-hfw, hfc+hfw)
+            #hfw = 2*(hfr-hfl)
+            #hfc = (hfr+hfl)/2
+            #ax_1d.set_xlim(hfc-hfw, hfc+hfw)
+
+            ax_1d.axvline(scen, color='red')
+            if sl is not None and sr is not None:
+                ax_1d.axvline(sl, color='green')
+                ax_1d.axvline(sr, color='green')
+                ax_1d.axvline(hfl, color='blue')
+                ax_1d.axvline(hfr, color='blue')
+                delta = sr-sl
+                ax_1d.set_xlim(sl-delta/4, sr+delta/4)
+
         return hfr-hfl, satur, rc
     else:
         return None
