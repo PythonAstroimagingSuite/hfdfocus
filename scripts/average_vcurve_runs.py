@@ -86,6 +86,13 @@ if __name__ == '__main__':
     #sys.stdout.write('\n\nAverage Fit Params\n')
     sys.stdout.write(j + '\n')
 
+    # format for YAML
+    sys.stdout.write('\nYAML\n')
+    sys.stdout.write(f'  vcurve_ls: {ls_avg}\n')
+    sys.stdout.write(f'  vcurve_lp: {lp_avg}\n')
+    sys.stdout.write(f'  vcurve_rs: {rs_avg}\n')
+    sys.stdout.write(f'  vcurve_rp: {rp_avg}\n')
+
     if args.debugplots:
         fig = plt.figure()
         ax_l = fig.add_subplot(221)

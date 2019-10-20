@@ -109,6 +109,8 @@ def measure_frame(starimage_data):
                 delta = sr-sl
                 ax_1d.set_xlim(sl-delta/4, sr+delta/4)
 
+        logging.info(f'measure_frame: HFD: {hfr-hfl:5.3f} SATUR: {satur} FLUX: {totflux:6.1f}')
+
         return hfr-hfl, satur, rc
     else:
         return None
@@ -158,7 +160,7 @@ def move_focuser(pos):
 
     sdi.wait_on_focuser_move(focuser)
 
-def measure_at_focus_pos(fpos, focus_expos):
+def measure_at_focus_pos(fpos, focus_expos, autoexpose=False, autoexpose_tries=4):
     if not args.simul or args.forcehw:
         if focuser.get_absolute_position() != fpos:
             logging.info(f'Moving focuser to {fpos}')
@@ -166,7 +168,11 @@ def measure_at_focus_pos(fpos, focus_expos):
             time.sleep(args.focusdelay)
 
     use_expos = focus_expos
-    for i in range(0, 4):
+    if autoexpose:
+        ntries = autoexpose_tries
+    else:
+        ntries = 1
+    for i in range(0, ntries):
 
         imgname = os.path.join(IMAGESDIR, f'vcurve_focuspos_{fpos}.fit')
         if not args.simul:
@@ -238,12 +244,15 @@ def determine_final_hfd(fpos_best, best_expos):
     s_min = 0.01
     first = True
     final_hfd = None
+    logging.info('determine_final_hfd: starting exposure attempts')
     while True:
         s_fact = (s_max + s_min)/2
         logging.info(f'scale min/max/cur: {s_min} {s_max} {s_fact}')
-        rc = measure_at_focus_pos(fpos_best, s_fact*best_expos)
+        rc = measure_at_focus_pos(fpos_best, s_fact*best_expos, autoexpose=False)
+        logging.info(f'first = {first}')
         if rc is None:
             if first:
+                logging.error('determine_final_hfd: couldnt find a star first try!')
                 return None
 #                logging.error('No star found!')
 #                if not args.simul or args.forcehw:
@@ -283,13 +292,15 @@ def determine_final_hfd(fpos_best, best_expos):
                 logging.warning(f'Saturated setting s_max to {s_fact}')
                 s_max = s_fact
 
-            first = False
+        logging.info('determine_final_hfd: setting first to False')
+        first = False
 
         best_tries += 1
         if best_tries > 5:
             logging.error(f'Unble to take best focus exposure after {best_tries-1} tries!.')
             break
 
+    logging.info('determine_final_hfd: return value {final_hfd}, {satur}')
     return final_hfd, satur
 
 
@@ -516,6 +527,7 @@ if __name__ == '__main__':
             near_hfd = ap.settings.autofocus.get('near_hfd', None)
             max_hfd = ap.settings.autofocus.get('max_hfd', None)
             backlash = ap.settings.autofocus.get('backlash', 0)
+            final_offset = ap.settings.autofocus.get('final_offset', 0)
         else:
             focuser_driver = args.focuser
             camera_driver = args.camera
@@ -530,6 +542,9 @@ if __name__ == '__main__':
             near_hfd = args.near_hfd
             backlash = args.backlash
             backend_name = None
+            final_offset = 0
+
+        logging.info(f'final_offset = {final_offset}')
 
         sdi = SDI()
 
@@ -830,11 +845,12 @@ if __name__ == '__main__':
 
     # now compute best focus
     if avg_near_hfd is not None:
-        fpos_best = int(fpos_near + fdir*int(abs(avg_near_hfd/vslope)) + vpid)
+        logging.info(f'Using final_offset = {final_offset}')
+        fpos_best = int(fpos_near + fdir*int(abs(avg_near_hfd/vslope)) + vpid + final_offset)
     else:
         fpos_best = None
 
-    logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_near} {int(avg_near_hfd/vslope)} {vpid}')
+    logging.info(f'BEST FOCUS POSITION = {fpos_best} {fpos_near} {int(avg_near_hfd/vslope)} {vpid} {final_offset}')
 
     # when using the internal 'focus simulator' we don't impose a min/max position limit
     if (not args.simul or args.forcehw) and (fpos_best > FOCUSER_MAX_POS or fpos_best < FOCUSER_MIN_POS):
