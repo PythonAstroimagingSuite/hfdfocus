@@ -300,7 +300,7 @@ def determine_final_hfd(fpos_best, best_expos):
             logging.error(f'Unble to take best focus exposure after {best_tries-1} tries!.')
             break
 
-    logging.info('determine_final_hfd: return value {final_hfd}, {satur}')
+    logging.info(f'determine_final_hfd: return value {final_hfd}, {satur}')
     return final_hfd, satur
 
 

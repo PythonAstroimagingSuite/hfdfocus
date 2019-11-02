@@ -5,6 +5,13 @@ import numpy as np
 import argparse
 import logging
 
+print("find_nearby_stars.py: DISABLED IERS AGE CHECK!")
+from astropy.utils.iers import conf
+#conf.iers_auto_url = "https://datacenter.iers.org/data/9/finals2000A.all"
+conf.iers_auto_url = "ftp://cddis.gsfc.nasa.gov/pub/products/iers/finals2000A.all"
+conf.auto_max_age = None
+
+
 from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
