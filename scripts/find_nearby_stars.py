@@ -19,15 +19,19 @@ from astropy.coordinates import Angle, SkyCoord
 from hfdfocus.SAOCatalog import load_SAOCatalog_binary
 
 if __name__ == '__main__':
+    LONG_FORMAT = '%(asctime)s.%(msecs)03d [%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+    SHORT_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
+
+
     logging.basicConfig(filename='find_star.log',
                         filemode='w',
                         level=logging.DEBUG,
-                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        format=LONG_FORMAT, #format='%(asctime)s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
     # add to screen as well
     log = logging.getLogger()
-    formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+    formatter = logging.Formatter(SHORT_FORMAT)
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
