@@ -50,6 +50,96 @@ print(mpl.get_backend())
 import matplotlib.pyplot as plt
 
 
+# copied from pyastroviewer::StarFitHFR!
+
+class StarFitResult:
+    def __init__(self, star_cx, star_cy, star_r, star_f,
+                 nstars, bgest, noiseest, width, height):
+        self.star_cx = star_cx
+        self.star_cy = star_cy
+        self.star_r = star_r
+        self.star_f = star_f
+        self.nstars = nstars
+        self.bgest = bgest
+        self.noiseest = noiseest
+        self.width = width
+        self.height = height
+
+    # compute split of stars in different annuli in percentage of image diagonal
+
+    def compute_hfr_in_out(self, r_ex=0, r_in=0.35, r_gap=0.1, r_out=0.9):
+
+        hfr_result_in = self.filter_range(r_low=r_ex, r_high=r_in)
+        hfr_result_out = self.filter_range(r_low=r_in+r_gap, r_high=r_out)
+
+        if hfr_result_in.nstars > 0:
+            hfr_in = np.median(hfr_result_in.star_r)
+        else:
+            hfr_in = np.nan
+
+        if hfr_result_out.nstars > 0:
+            hfr_out = np.median(hfr_result_out.star_r)
+        else:
+            hfr_out = np.nan
+
+        self.hfr_in = hfr_in
+        self.hfr_out = hfr_out
+
+        return
+
+        diag2 = (self.width**2+self.height**2)/4
+
+        halfwid = self.width/2
+        halfht  = self.height/2
+
+        thres_ex2 = diag2*r_ex**2
+        thres_in2 = diag2*r_in**2
+        thres_gap2 = diag2*(r_in+r_gap)**2
+        thres_out2 = diag2*r_out**2
+
+        hfr_in = []
+        hfr_out = []
+
+        for x, y, r in zip(self.star_cx, self.star_cy, self.star_r):
+            rad2 = (x-halfwid)**2+(y-halfht)**2
+            if rad2 < thres_ex2:
+                continue
+            if rad2 < thres_in2:
+                hfr_in.append(r)
+                continue
+            if rad2 > thres_gap2 and rad2 < thres_out2:
+                hfr_out.append(r)
+
+        self.hfr_in = np.median(hfr_in)
+        self.hfr_out = np.median(hfr_out)
+
+    # return StarFitResult object with only stars in specified range
+    # radius is specified as fraction (0 to 1) of 1/2 diagonal distance
+    def filter_range(self, r_low=0, r_high=1):
+        diag2 = (self.width**2+self.height**2)/4
+
+        halfwid = self.width/2
+        halfht  = self.height/2
+
+        thres_low = diag2*r_low**2
+        thres_high = diag2*r_high**2
+
+        rad2 = (self.star_cx-halfwid)**2 + (self.star_cy-halfht)**2
+
+        valid_r_idx = np.where(np.logical_and(rad2 >= thres_low, rad2 <= thres_high))
+
+        logging.info(f'valid_r_idx = {valid_r_idx[0].shape[0]}')
+
+        return StarFitResult(self.star_cx[valid_r_idx],
+                             self.star_cy[valid_r_idx],
+                             self.star_r[valid_r_idx],
+                             self.star_f[valid_r_idx],
+                             valid_r_idx[0].shape[0],
+                             self.bgest,
+                             self.noiseest,
+                             self.width,
+                             self.height)
+
 @dataclass
 class StarInfo:
     """
@@ -241,7 +331,7 @@ def find_centroid(image_data, thres):
 
     return (ci, cj)
 
-def detect_stars(image_data, bgfact=50, satur=50000, window=100,
+def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
               starmodel=False, bgmodel=False, debugfits=False):
     """
     Find the stars in given image data.  All pixels less than bgfact*MAD over
@@ -319,7 +409,9 @@ def detect_stars(image_data, bgfact=50, satur=50000, window=100,
         pyfits.writeto(f'star_model_bgfact{bgfact}.fits', star_model.astype(float), overwrite=True)
 
     # use dilation to stregthen any structures
-    ndilate = 3
+    #
+    # setting this too large will make close stars merge together more frequently
+    ndilate = 1
     tmp_image = star_model
     logging.debug(f'dilating star_model {ndilate} times')
     ts = time.time()
@@ -341,28 +433,6 @@ def detect_stars(image_data, bgfact=50, satur=50000, window=100,
         pyfits.writeto(f'star_label.fits', star_label.astype(float), overwrite=True)
 
     logging.debug('Finding stars with >= 9 pix START')
-#    max_pix = 0
-#    max_l = None
-#    for l in ndimage.find_objects(star_label):
-#        #print(f'l={l}')
-#        npix = (l[0].stop-l[0].start)*(l[1].stop-l[1].start)
-#        #print(bgrem_data[l].shape, npix)
-#
-#        if npix < 9:
-#            logging.warning('not enuf pix')
-#            continue
-#
-##        if (bgrem_data[l] > satur).sum() > 0:
-##            print('bgrem too high')
-##            continue
-#
-#        if npix > max_pix:
-#            max_pix = npix
-#            max_l = l
-#
-#    if max_l is None:
-#        logging.error('find_star(): no object found')
-#        return None
 
     # create return object now we know there is at least one star
     detected = DetectedStars( bg_window, bgmodel, bgrem_data,
@@ -372,46 +442,88 @@ def detect_stars(image_data, bgfact=50, satur=50000, window=100,
     # now loop over labels and measure stars
     debug_star_boxes = np.zeros_like(star_model)
     star_results = []
+    accepted = []
     for cur_l in ndimage.find_objects(star_label):
-        star_boxes = np.zeros_like(star_model)
         npix_cur_l = (cur_l[0].stop-cur_l[0].start)*(cur_l[1].stop-cur_l[1].start)
 
         if npix_cur_l < 9:
             #logging.warning('not enuf pix')
             continue
 
+        nsat = np.sum(bgrem_data[cur_l] > satur)
+
+        if nsat > 3:
+            logging.info(f'skipping {cur_l} sat pix = {nsat}')
+            continue
+
+        estflux = np.sum(bgrem_data[cur_l])
+        accepted.append((cur_l, estflux))
+
+    if len(accepted) < 1:
+        logging.error('No accepted stars!')
+        return None
+
+    accepted.sort(key=lambda x: x[1], reverse=True)
+
+    logging.info(f'Accepted {len(accepted)} stars - max star set to {max_stars}')
+
+    idx = 0
+    for cur_l, xxxflux in accepted[:max_stars]:
+        logging.info(f'idx={idx} cur_l={cur_l}')
+        idx += 1
+
+        its = time.time()
+
         # see if another object is within window centered on main object
+        npix_cur_l = (cur_l[0].stop-cur_l[0].start)*(cur_l[1].stop-cur_l[1].start)
         alone = True
-        logging.debug('looking for nearby stars')
-        for l in ndimage.find_objects(star_label):
-            npix = (l[0].stop-l[0].start)*(l[1].stop-l[1].start)
-            logging.debug(f'{cur_l}, {l}, {npix_cur_l}, {npix}')
-            if l[0].start == cur_l[0].start and l[1].start == cur_l[1].start and \
-               l[0].stop == cur_l[0].stop and l[1].stop == cur_l[1].stop:
-                   logging.debug('skipping is original label')
-                   continue
+#        logging.debug('looking for nearby stars')
+#        for l in ndimage.find_objects(star_label):
+#            npix = (l[0].stop-l[0].start)*(l[1].stop-l[1].start)
+#            logging.debug(f'{cur_l}, {l}, {npix_cur_l}, {npix}')
+#            if l[0].start == cur_l[0].start and l[1].start == cur_l[1].start and \
+#               l[0].stop == cur_l[0].stop and l[1].stop == cur_l[1].stop:
+#                   logging.debug('skipping is original label')
+#                   continue
+#
+#            if npix > max_pix/2:
+#                alone = False
+#                break
+#
+#        if not alone:
+#            continue
 
-            if npix > npix_cur_l/2:
-                alone = False
-                break
-
-        if not alone:
-            logging.warning('ERROR: find_star() Another star is nearby!')
-
+        star_boxes = np.zeros_like(star_model)
         star_boxes[cur_l] = 1
+
         debug_star_boxes[cur_l] = 1
 
-        axes = get_major_minor_axes(dilate_star_model[cur_l])
-        majax = axes[0][2]
-        minax = axes[1][2]
-        ecc = math.sqrt(1.0-(minax/majax)**2)
-        logging.debug(f'Major/Minor/Ecc = {majax} {minax} {ecc}')
+        ite = time.time()
+        logging.info(f'1:{ite-its}')
+        its = time.time()
 
-        if ecc > 0.75:
-            logging.warning(f'fERROR find_star(): Eccentricity {ecc} is outside acceptable range - probably not alone')
-            alone = False
+#        axes = get_major_minor_axes(dilate_star_model[cur_l])
+#        majax = axes[0][2]
+#        minax = axes[1][2]
+#        ecc = math.sqrt(1.0-(minax/majax)**2)
+#        logging.debug(f'Major/Minor/Ecc = {majax} {minax} {ecc}')
+#
+#        if ecc > 0.75:
+#            logging.warning(f'ERROR find_star(): Eccentricity {ecc} is outside acceptable range - probably not alone')
+#            alone = False
 
-        cy, cx = ndimage.measurements.center_of_mass(star_boxes)
+        #cy, cx = ndimage.measurements.center_of_mass(star_boxes)
+
+        # this gives same answer and center_of_mass for squarish stars
+        cx = (cur_l[1].stop+cur_l[1].start)/2-0.5
+        cy = (cur_l[0].stop+cur_l[0].start)/2-0.5
+
+        #logging.info(f'cx/cx2 = {cx}/{cx2} cy/cy2 = {cy}/{cy2}')
+
+        ite = time.time()
+        logging.info(f'2:{ite-its}')
+        its = time.time()
+
         logging.debug(f'COM cx, cy = {cx}, {cy}')
     #    logging.debug(f'box={max_l}')
     #    logging.debug(f'boxperim = {2*pw+2*ph} predperim={np.pi*(pw+ph)/2} actperim = {perim}')
@@ -435,9 +547,20 @@ def detect_stars(image_data, bgfact=50, satur=50000, window=100,
         logging.debug(f'cx = {cx} cy = {cy} bg = {bglevel} mad = {bgmad} '
                       f'estsize = {estsize} estflux = {estflux}')
 
+        ite = time.time()
+        logging.info(f'3:{ite-its}')
+        its = time.time()
+
         res = StarInfo(cx, cy, bglevel, bgmad, estsize, estflux, None, None, alone)
 
         star_results.append(res)
+
+        ite = time.time()
+        logging.info(f'4:{ite-its}')
+        its = time.time()
+
+    # sort by estimated flux
+    star_results.sort(key=lambda x: x.estflux, reverse=True)
 
     if debugfits:
         pyfits.writeto(f'multiple_star_boxes.fits', debug_star_boxes.astype(float), overwrite=True)
@@ -599,6 +722,10 @@ def find_star_limits_robust_from_max_region(profile, thres=0):
             maxreg = a[0]
             maxsum = rsum
 
+    if maxreg is None:
+        logging.error('Could not find max region!')
+        return None, None
+
     logging.debug(f'max region {maxreg.start} {maxreg.stop} {maxsum}')
 
     left = maxreg.start-1
@@ -671,6 +798,10 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     cidx = np.sum(idx[lidx:ridx]*profile[lidx:ridx])/np.sum(profile[lidx:ridx])
     logging.debug(f'center = {cidx}')
 
+    if np.isnan(cidx):
+        logging.error('center is nan!')
+        return None
+
     # find left, right limits
     # invert profile as y as a function of x on left and right
     # sides of the profile
@@ -678,11 +809,15 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     lidx_hi = int(lidx+2)
     ridx_low = int(ridx)
     ridx_hi = int(ridx+2)
-    print(lidx, lidx_low, lidx_hi, ridx, ridx_low, ridx_hi)
-    print(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
-    print(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
-    lfunc = interp1d(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
-    rfunc = interp1d(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
+    #print(lidx, lidx_low, lidx_hi, ridx, ridx_low, ridx_hi)
+    #print(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
+    #print(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
+    try:
+        lfunc = interp1d(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
+        rfunc = interp1d(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
+    except:
+        logging.error('Could not find left/right limits!')
+        return None
 
     lx = lfunc(thres)
     rx = rfunc(thres)
@@ -780,7 +915,7 @@ def find_star_HFD(star, image_data, thres=10000, win=100, debugplots=False, debu
     xcen = star.cx
     ycen = star.cy
     bg = star.bglevel
-    mad = star.bgmad
+    #mad = star.bgmad
     estsize = star.estsize/1.5
     logging.info(f'cx: {xcen} cy: {ycen} - using estsize of {estsize} for profile window')
 
@@ -790,6 +925,7 @@ def find_star_HFD(star, image_data, thres=10000, win=100, debugplots=False, debu
     xhi = min(img_wd-1, int(xcen+estsize))
     ylow = max(0, int(ycen-estsize))
     yhi = min(img_ht-1, int(ycen+estsize))
+    logging.debug(f'xlow:xhi={xlow}:{xhi}  ylow:yhi={ylow}:{yhi}')
     crop_data = image_data[ylow:yhi, xlow:xhi]
 
     if debugplots:
@@ -804,40 +940,57 @@ def find_star_HFD(star, image_data, thres=10000, win=100, debugplots=False, debu
     logging.debug(f'thres = {thres}')
     logging.debug(f'profile = {profile}')
 
+    bg_est = np.median(profile)
+    max_est = np.max(profile)
+    thres = bg_est + 0.05*(max_est-bg_est)
+
     if debugplots:
         ax_1d.plot(profile)
-        ax_1d.axhline(bg, color='green')
-        ax_1d.axhline(bg+25*mad, color='green')
+        ax_1d.axhline(thres, color='purple')
+#        ax_1d.axhline(bg, color='green')
+#        ax_1d.axhline(bg+25*mad, color='green')
 
         plt.draw()
+        #plt.pause(3333)
 
-    return find_hfd_from_1D(profile, thres=bg+10*mad)
+    return find_hfd_from_1D(profile, thres=thres)
 
-def measure_stars_in_image(image_data):
+def measure_stars_in_image(image_data, max_stars=100, thres=10000, debugplots=False, debugfits=False):
 
     bg = 800
     thres = 10000
 
-    #xcen, ycen = find_star(image_data, debugfits=False)
-    detected = detect_stars(image_data, debugfits=True)
-    print(detected)
+    detected = detect_stars(image_data, max_stars=max_stars, debugfits=debugfits)
 
     if detected is not None and len(detected.stars) > 0:
-        for star in detected.stars:
+        idx = 0
+        removed_stars = []
+        star_range = slice(0,len(detected.stars))
+        #star_range = slice(0, 5)
+        for star in detected.stars[star_range]:
 
-            rc = find_star_HFD(star, image_data, debugplots=True, debugfits=False)
+            rc = find_star_HFD(star, image_data, thres=thres,
+                               debugplots=debugplots, debugfits=debugfits)
+
+            logging.info(f'idx={idx} star = {star} rc = {rc}')
+            idx += 1
 
             if rc is None:
+                logging.warning(f'removing {star}')
+                removed_stars.append(star)
                 continue
 
             cidx, lx, rx, lr, rr, totflux = rc
             hfd = rr - lr
 
-            if args.debugplots:
+            star.hfd = hfd
+            star.flux = totflux
+
+            if debugplots:
                 #hfw = 2*(hfr-hfl)
                 #hfc = (hfr+hfl)/2
                 #ax_1d.set_xlim(hfc-hfw, hfc+hfw)
-                fig.suptitle(f'HFD {hfd:5.2f}')
+                fig.suptitle(f'idx={idx} cx={star.cx:5.3f} cy={star.cy:5.3f} HFD {hfd:5.2f}')
 
                 ax_1d.axvline(cidx, color='red')
                 if lx is not None and rx is not None:
@@ -848,11 +1001,43 @@ def measure_stars_in_image(image_data):
                     delta = rx-lx
                     ax_1d.set_xlim(lx-delta/4, rx+delta/4)
 
-            fig.show()
-            plt.pause(1)
+                fig.show()
+                #plt.pause(1)
 
-        if args.debugplots:
+        for star in removed_stars:
+            detected.stars.remove(star)
+
+        idx = 0
+        for star in detected.stars[star_range]:
+            logging.info(f'idx {idx}: cx={star.cx:5.3f} cy={star.cy:5.3f} '
+                         f'size={star.estsize:5.3f} hfd={star.hfd:6.3f} '
+                         f'flux={star.flux}')
+            idx += 1
+
+        if debugplots:
             plt.show(block=True)
+
+    return detected
+
+# pyastroviewer::StarFitHFR compatible call
+def star_fit_hfr(image_data, max_stars=100, bgfact=50, satur=50000, window=7,
+                 debugfits=False):
+
+    detected = measure_stars_in_image(image_data, max_stars=max_stars)
+
+    if detected is not None:
+        star_cx = np.array([x.cx for x in detected.stars])
+        star_cy = np.array([x.cy for x in detected.stars])
+        star_r = np.array([x.hfd for x in detected.stars])
+        star_f = np.array([x.flux for x in detected.stars])
+        print(star_cx)
+        ht, wd = image_data.shape
+        result = StarFitResult(star_cx, star_cy, star_r, star_f, len(star_cx),
+                               0, 0, wd, ht)
+    else:
+        result = None
+
+    return result
 
 if __name__ == '__main__':
 
@@ -867,9 +1052,9 @@ if __name__ == '__main__':
 
     # add to screen as well
     log = logging.getLogger()
-    formatter = logging.Formatter(LONG_FORMAT) #'%(asctime)s %(levelname)-8s %(message)s')
+    formatter = logging.Formatter(SHORT_FORMAT) #'%(asctime)s %(levelname)-8s %(message)s')
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
@@ -877,111 +1062,27 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('infile', type=str, help='Target')
     parser.add_argument('--debugplots', action='store_true', help='show debug plots')
+    parser.add_argument('--debugfits', action='store_true', help='dump debug images')
+    parser.add_argument('--debug', action='store_true', help='show debug info')
 
     args = parser.parse_args()
+
+    if args.debug:
+        ch.setLevel(logging.DEBUG)
 
 #    logging.info(f'command args = {args}')
 
     infile = args.infile
 
     hdu = pyfits.open(infile)
-    print(hdu[0].data)
+    #print(hdu[0].data)
     image_data = hdu[0].data.astype(float)
     hdu.close()
 
+    measure_stars_in_image(image_data, debugplots=args.debugplots, debugfits=args.debugfits)
 
-    measure_stars_in_image(image_data)
+    if args.debugplots:
+        plt.pause(1000)
 
     sys.exit(0)
-
-    bg = 800
-    thres = 10000
-
-    #xcen, ycen = find_star(image_data, debugfits=False)
-    detected = detect_stars(image_data, debugfits=True)
-    print(detected)
-
-    if detected is not None and len(detected.stars) > 0:
-        for star in detected.stars:
-
-            rc = find_star_HFD(star, image_data, debugplots=True, debugfits=False)
-
-            if rc is None:
-                continue
-
-            cidx, lx, rx, lr, rr, totflux = rc
-            hfd = rr - lr
-
-            if args.debugplots:
-                #hfw = 2*(hfr-hfl)
-                #hfc = (hfr+hfl)/2
-                #ax_1d.set_xlim(hfc-hfw, hfc+hfw)
-                fig.suptitle(f'HFD {hfd:5.2f}')
-
-                ax_1d.axvline(cidx, color='red')
-                if lx is not None and rx is not None:
-                    ax_1d.axvline(lx, color='green')
-                    ax_1d.axvline(rx, color='green')
-                    ax_1d.axvline(lr, color='blue')
-                    ax_1d.axvline(rr, color='blue')
-                    delta = rx-lx
-                    ax_1d.set_xlim(lx-delta/4, rx+delta/4)
-
-            fig.show()
-            plt.pause(1)
-
-        if args.debugplots:
-            plt.show(block=True)
-
-
-
-
-#            win = 100
-#            xlow = int(s.cx-win/2)
-#            xhi = int(s.cx+win/2)
-#            ylow = int(s.cy-win/2)
-#            yhi = int(s.cy+win/2)
-#            crop_data = image_data[ylow:yhi, xlow:xhi]
-#
-#            print(xlow, xhi, ylow, yhi)
-#
-#            if args.debugplots:
-#                fig = plt.figure()
-#                ax_2d = fig.add_subplot(121)
-#                ax_1d = fig.add_subplot(122)
-#                im = ax_2d.imshow((crop_data-bg).astype(float))
-#                fig.colorbar(im, ax=ax_2d)
-#
-#            plt.show()
-#
-#            profile = horiz_bin_window(crop_data, bg=bg)
-#
-#            print('thres = ', thres)
-#            print('profile = ', profile)
-#
-#            if args.debugplots:
-#                ax_1d.plot(profile)
-#
-#            scen, sl, sr, hfl, hfr = find_hfd_from_1D(profile, thres=thres)
-#
-#            if args.debugplots:
-#                ax_1d.axvline(scen, color='red')
-#                if sl is not None and sr is not None:
-#                    ax_1d.axvline(sl, color='green')
-#                    ax_1d.axvline(sr, color='green')
-#                    ax_1d.axvline(hfl, color='blue')
-#                    ax_1d.axvline(hfr, color='blue')
-#                    delta = sr-sl
-#                    ax_1d.set_xlim(sl-delta/4, sr+delta/4)
-#
-#            print('total counts = ', np.sum(crop_data-bg))
-#
-#            if args.debugplots:
-#                plt.show()
-#
-#            f = open('hfd.txt', 'a')
-#            f.write(f'{infile[26:30]}, {hfr-hfl}\n')
-#            f.close()
-
-
 
