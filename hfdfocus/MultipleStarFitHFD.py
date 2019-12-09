@@ -40,7 +40,15 @@ from scipy.integrate import romb
 import astropy.io.fits as pyfits
 
 # for testing
+import matplotlib as mpl
+#mpl.use("Qt5agg")
+print(mpl.get_backend())
+mpl.use("TkAgg")
+print(mpl.get_backend())
+#mpl.rcParams['toolbar'] = 'None'
+#mpl.rc('font', size=8)
 import matplotlib.pyplot as plt
+
 
 @dataclass
 class StarInfo:
@@ -52,15 +60,21 @@ class StarInfo:
         cy:                Centroid Y
         bglevel:           Background level at star
         bgmad:             Background MAD at star
+        estsize:           Estimated size in pixels of detected blob - NOT HFD measurement!
+        estflux:           Estimated flux from detected blob - NOT precise!
+        hfd:               HFD
+        flux:              HFD derived flux measurement
         alone:             Whether another star was nearby
-        flux:              Sum of pixels in star with background subtracted
     """
     cx: float
     cy: float
     bglevel: float
     bgmad: float
-    alone: bool
+    estsize: float
+    estflux: float
+    hfd: float
     flux: float
+    alone: bool
 
 @dataclass
 class DetectedStars:
@@ -413,14 +427,15 @@ def detect_stars(image_data, bgfact=50, satur=50000, window=100,
         bglevel = np.median(data)
         data = bgrem_data[yl:ym, xl:xm]
         bgmad = compute_noise_level(data)
-        flux = np.sum(bgrem_data[cur_l])
-        logging.debug(f'cx = {cx} cy = {cy} bg = {bglevel} mad = {bgmad} flux = {flux}')
 
-        ttot_e = time.time()
+        estsize = math.sqrt((cur_l[0].stop-cur_l[0].start)*(cur_l[0].stop-cur_l[0].start)+
+                            (cur_l[1].stop-cur_l[1].start)*(cur_l[1].stop-cur_l[1].start))
 
-        logging.debug(f'find_star took {ttot_e-ttot_s} seconds')
+        estflux = np.sum(bgrem_data[cur_l])
+        logging.debug(f'cx = {cx} cy = {cy} bg = {bglevel} mad = {bgmad} '
+                      f'estsize = {estsize} estflux = {estflux}')
 
-        res = StarInfo(cx, cy, bglevel, bgmad, alone, flux)
+        res = StarInfo(cx, cy, bglevel, bgmad, estsize, estflux, None, None, alone)
 
         star_results.append(res)
 
@@ -428,6 +443,10 @@ def detect_stars(image_data, bgfact=50, satur=50000, window=100,
         pyfits.writeto(f'multiple_star_boxes.fits', debug_star_boxes.astype(float), overwrite=True)
 
     detected.stars = star_results
+
+    ttot_e = time.time()
+
+    logging.info(f'detect_stars took {ttot_e-ttot_s} seconds')
 
     return detected
 
@@ -659,9 +678,9 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     lidx_hi = int(lidx+2)
     ridx_low = int(ridx)
     ridx_hi = int(ridx+2)
-#    print(lidx, lidx_low, lidx_hi, ridx, ridx_low, ridx_hi)
-#    print(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
-#    print(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
+    print(lidx, lidx_low, lidx_hi, ridx, ridx_low, ridx_hi)
+    print(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
+    print(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
     lfunc = interp1d(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
     rfunc = interp1d(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
 
@@ -751,41 +770,26 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
 
     return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r, totflux)
 
-def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
-    """
-    Given image data find brightest star and compute HFD.
 
-    :param image_data: Numpy 2D image data.
-    :param thres:  Binned pixels less than this value ignored in profile computation.
-    :param win: Size of window used to compute star data.
-    :param debugplots: If True then matplotlib plots of progress will be generated.
-    :param debugfits: If True then FITS files of various stages of computation are output.
-    :returns:
-        Tuple containing:
-            - index of star center of star profile
-            - index of left extent of star profile
-            - index of right extent of star profile
-            - interpolated 'half flux' boundary to left of park
-            - interpolated 'half flux' boundary to right of park
-            - total flux in star profile
-            - flag indicating whether the star was alone or not.
-    :rtype: (int, int, int, float, float, float, bool)
+def find_star_HFD(star, image_data, thres=10000, win=100, debugplots=False, debugfits=False):
+    # yuck for testing!
+    global fig, ax_2d, ax_1d
 
-    """
+    #xcen, ycen, bg, noise, starmask, alone = find_star(image_data, debugfits=debugfits)
 
-#        Tuple containing , left and right limits, left and right
-#        "half flux" limits, total flux in star profile, and a flag of whether the
-#        star was alone or not.
-
-
-    xcen, ycen, bg, noise, starmask, alone = find_star(image_data, debugfits=debugfits)
+    xcen = star.cx
+    ycen = star.cy
+    bg = star.bglevel
+    mad = star.bgmad
+    estsize = star.estsize/1.5
+    logging.info(f'cx: {xcen} cy: {ycen} - using estsize of {estsize} for profile window')
 
     img_ht, img_wd = image_data.shape
 
-    xlow = max(0, int(xcen-win/2))
-    xhi = min(img_wd-1, int(xcen+win/2))
-    ylow = max(0, int(ycen-win/2))
-    yhi = min(img_ht-1, int(ycen+win/2))
+    xlow = max(0, int(xcen-estsize))
+    xhi = min(img_wd-1, int(xcen+estsize))
+    ylow = max(0, int(ycen-estsize))
+    yhi = min(img_ht-1, int(ycen+estsize))
     crop_data = image_data[ylow:yhi, xlow:xhi]
 
     if debugplots:
@@ -802,74 +806,68 @@ def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, 
 
     if debugplots:
         ax_1d.plot(profile)
+        ax_1d.axhline(bg, color='green')
+        ax_1d.axhline(bg+25*mad, color='green')
+
         plt.draw()
 
-    cidx, lx, rx, lr, rr, totflux = find_hfd_from_1D(profile, thres=thres)
-    return cidx, lx, rx, lr, rr, totflux, alone
+    return find_hfd_from_1D(profile, thres=bg+10*mad)
 
-def test_1d_with_gaussian():
+def measure_stars_in_image(image_data):
 
-    # generate 2D gaussian sample star
-    sigma_x = 10
-    sigma_y = sigma_x
-    size = 45
-    peak = 200000/sigma_x/sigma_y/2/np.pi
     bg = 800
-    bgnoise = 50
-    thres = math.sqrt(size)*5*bgnoise
+    thres = 10000
 
-    x = np.linspace(-size/2, size/2, size)
-    y = np.linspace(-size/2, size/2, size)
+    #xcen, ycen = find_star(image_data, debugfits=False)
+    detected = detect_stars(image_data, debugfits=True)
+    print(detected)
 
-    x, y = np.meshgrid(x, y)
-    #z = (1/(2*np.pi*sigma_x*sigma_y) * np.exp(-(x**2/(2*sigma_x**2)
-    #     + y**2/(2*sigma_y**2))))
-    z = (peak * np.exp(-(x**2/(2*sigma_x**2)
-         + y**2/(2*sigma_y**2))))
-    z[np.where((x**2+y**2) < 3)] = 0
-    z += np.random.normal(loc=bg, scale=bgnoise, size=z.shape)
+    if detected is not None and len(detected.stars) > 0:
+        for star in detected.stars:
 
-    #plt.contourf(x, y, z, cmap='Blues')
-    fig = plt.figure()
-    ax_2d = fig.add_subplot(121)
-    ax_1d = fig.add_subplot(122)
-    im = ax_2d.imshow(z-peak)
-    fig.colorbar(im, ax=ax_2d)
+            rc = find_star_HFD(star, image_data, debugplots=True, debugfits=False)
 
-    profile = horiz_bin_window(z, bg=bg)
+            if rc is None:
+                continue
 
-    #print('thres = ', thres)
-    #print('profile = ', profile)
+            cidx, lx, rx, lr, rr, totflux = rc
+            hfd = rr - lr
 
-    scen, sl, sr = find_hfd_from_1D(profile, thres=thres)
+            if args.debugplots:
+                #hfw = 2*(hfr-hfl)
+                #hfc = (hfr+hfl)/2
+                #ax_1d.set_xlim(hfc-hfw, hfc+hfw)
+                fig.suptitle(f'HFD {hfd:5.2f}')
 
-    ax_1d.plot(profile)
+                ax_1d.axvline(cidx, color='red')
+                if lx is not None and rx is not None:
+                    ax_1d.axvline(lx, color='green')
+                    ax_1d.axvline(rx, color='green')
+                    ax_1d.axvline(lr, color='blue')
+                    ax_1d.axvline(rr, color='blue')
+                    delta = rx-lx
+                    ax_1d.set_xlim(lx-delta/4, rx+delta/4)
 
-    ax_1d.axvline(scen, color='red')
-    if sl is not None and sr is not None:
-        ax_1d.axvline(sl, color='green')
-        ax_1d.axvline(sr, color='green')
+            fig.show()
+            plt.pause(1)
 
-    #print('total counts = ', np.sum(z-bg))
-
-    plt.show()
-
-    sys.exit(1)
-
-
-
-
+        if args.debugplots:
+            plt.show(block=True)
 
 if __name__ == '__main__':
+
+    LONG_FORMAT = '%(asctime)s.%(msecs)03d [%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+    SHORT_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
+
     logging.basicConfig(filename='MultipleStarFitHFD.log',
                         filemode='w',
-                        level=logging.INFO,
+                        level=logging.DEBUG,
                         format='%(asctime)s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
     # add to screen as well
     log = logging.getLogger()
-    formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+    formatter = logging.Formatter(LONG_FORMAT) #'%(asctime)s %(levelname)-8s %(message)s')
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
@@ -891,6 +889,11 @@ if __name__ == '__main__':
     image_data = hdu[0].data.astype(float)
     hdu.close()
 
+
+    measure_stars_in_image(image_data)
+
+    sys.exit(0)
+
     bg = 800
     thres = 10000
 
@@ -898,48 +901,87 @@ if __name__ == '__main__':
     detected = detect_stars(image_data, debugfits=True)
     print(detected)
 
-    win = 100
-    xlow = int(xcen-win/2)
-    xhi = int(xcen+win/2)
-    ylow = int(ycen-win/2)
-    yhi = int(ycen+win/2)
-    crop_data = image_data[ylow:yhi, xlow:xhi]
+    if detected is not None and len(detected.stars) > 0:
+        for star in detected.stars:
 
-    if args.debugplots:
-        fig = plt.figure()
-        ax_2d = fig.add_subplot(121)
-        ax_1d = fig.add_subplot(122)
-        im = ax_2d.imshow((crop_data-bg).astype(float))
-        fig.colorbar(im, ax=ax_2d)
+            rc = find_star_HFD(star, image_data, debugplots=True, debugfits=False)
 
-    profile = horiz_bin_window(crop_data, bg=bg)
+            if rc is None:
+                continue
 
-    print('thres = ', thres)
-    print('profile = ', profile)
+            cidx, lx, rx, lr, rr, totflux = rc
+            hfd = rr - lr
 
-    if args.debugplots:
-        ax_1d.plot(profile)
+            if args.debugplots:
+                #hfw = 2*(hfr-hfl)
+                #hfc = (hfr+hfl)/2
+                #ax_1d.set_xlim(hfc-hfw, hfc+hfw)
+                fig.suptitle(f'HFD {hfd:5.2f}')
 
-    scen, sl, sr, hfl, hfr = find_hfr_from_1D(profile, thres=thres)
+                ax_1d.axvline(cidx, color='red')
+                if lx is not None and rx is not None:
+                    ax_1d.axvline(lx, color='green')
+                    ax_1d.axvline(rx, color='green')
+                    ax_1d.axvline(lr, color='blue')
+                    ax_1d.axvline(rr, color='blue')
+                    delta = rx-lx
+                    ax_1d.set_xlim(lx-delta/4, rx+delta/4)
 
-    if args.debugplots:
-        ax_1d.axvline(scen, color='red')
-        if sl is not None and sr is not None:
-            ax_1d.axvline(sl, color='green')
-            ax_1d.axvline(sr, color='green')
-            ax_1d.axvline(hfl, color='blue')
-            ax_1d.axvline(hfr, color='blue')
-            delta = sr-sl
-            ax_1d.set_xlim(sl-delta/4, sr+delta/4)
+            fig.show()
+            plt.pause(1)
 
-    print('total counts = ', np.sum(crop_data-bg))
+        if args.debugplots:
+            plt.show(block=True)
 
-    if args.debugplots:
-        plt.show()
 
-    f = open('hfd.txt', 'a')
-    f.write(f'{infile[26:30]}, {hfr-hfl}\n')
-    f.close()
+
+
+#            win = 100
+#            xlow = int(s.cx-win/2)
+#            xhi = int(s.cx+win/2)
+#            ylow = int(s.cy-win/2)
+#            yhi = int(s.cy+win/2)
+#            crop_data = image_data[ylow:yhi, xlow:xhi]
+#
+#            print(xlow, xhi, ylow, yhi)
+#
+#            if args.debugplots:
+#                fig = plt.figure()
+#                ax_2d = fig.add_subplot(121)
+#                ax_1d = fig.add_subplot(122)
+#                im = ax_2d.imshow((crop_data-bg).astype(float))
+#                fig.colorbar(im, ax=ax_2d)
+#
+#            plt.show()
+#
+#            profile = horiz_bin_window(crop_data, bg=bg)
+#
+#            print('thres = ', thres)
+#            print('profile = ', profile)
+#
+#            if args.debugplots:
+#                ax_1d.plot(profile)
+#
+#            scen, sl, sr, hfl, hfr = find_hfd_from_1D(profile, thres=thres)
+#
+#            if args.debugplots:
+#                ax_1d.axvline(scen, color='red')
+#                if sl is not None and sr is not None:
+#                    ax_1d.axvline(sl, color='green')
+#                    ax_1d.axvline(sr, color='green')
+#                    ax_1d.axvline(hfl, color='blue')
+#                    ax_1d.axvline(hfr, color='blue')
+#                    delta = sr-sl
+#                    ax_1d.set_xlim(sl-delta/4, sr+delta/4)
+#
+#            print('total counts = ', np.sum(crop_data-bg))
+#
+#            if args.debugplots:
+#                plt.show()
+#
+#            f = open('hfd.txt', 'a')
+#            f.write(f'{infile[26:30]}, {hfr-hfl}\n')
+#            f.close()
 
 
 
