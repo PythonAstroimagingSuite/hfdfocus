@@ -453,7 +453,7 @@ def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
         nsat = np.sum(bgrem_data[cur_l] > satur)
 
         if nsat > 3:
-            logging.info(f'skipping {cur_l} sat pix = {nsat}')
+            logging.debug(f'skipping {cur_l} sat pix = {nsat}')
             continue
 
         estflux = np.sum(bgrem_data[cur_l])
@@ -469,7 +469,7 @@ def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
 
     idx = 0
     for cur_l, xxxflux in accepted[:max_stars]:
-        logging.info(f'idx={idx} cur_l={cur_l}')
+        #logging.debug(f'idx={idx} cur_l={cur_l}')
         idx += 1
 
         its = time.time()
@@ -499,7 +499,7 @@ def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
         debug_star_boxes[cur_l] = 1
 
         ite = time.time()
-        logging.info(f'1:{ite-its}')
+        #logging.debug(f'1:{ite-its}')
         its = time.time()
 
 #        axes = get_major_minor_axes(dilate_star_model[cur_l])
@@ -518,13 +518,13 @@ def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
         cx = (cur_l[1].stop+cur_l[1].start)/2-0.5
         cy = (cur_l[0].stop+cur_l[0].start)/2-0.5
 
-        #logging.info(f'cx/cx2 = {cx}/{cx2} cy/cy2 = {cy}/{cy2}')
+        #logging.debug(f'cx/cx2 = {cx}/{cx2} cy/cy2 = {cy}/{cy2}')
 
         ite = time.time()
-        logging.info(f'2:{ite-its}')
+        #logging.debug(f'2:{ite-its}')
         its = time.time()
 
-        logging.debug(f'COM cx, cy = {cx}, {cy}')
+        #logging.debug(f'COM cx, cy = {cx}, {cy}')
     #    logging.debug(f'box={max_l}')
     #    logging.debug(f'boxperim = {2*pw+2*ph} predperim={np.pi*(pw+ph)/2} actperim = {perim}')
 
@@ -544,11 +544,11 @@ def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
                             (cur_l[1].stop-cur_l[1].start)*(cur_l[1].stop-cur_l[1].start))
 
         estflux = np.sum(bgrem_data[cur_l])
-        logging.debug(f'cx = {cx} cy = {cy} bg = {bglevel} mad = {bgmad} '
-                      f'estsize = {estsize} estflux = {estflux}')
+        #logging.debug(f'cx = {cx} cy = {cy} bg = {bglevel} mad = {bgmad} '
+        #              f'estsize = {estsize} estflux = {estflux}')
 
         ite = time.time()
-        logging.info(f'3:{ite-its}')
+        #logging.debug(f'3:{ite-its}')
         its = time.time()
 
         res = StarInfo(cx, cy, bglevel, bgmad, estsize, estflux, None, None, alone)
@@ -556,7 +556,7 @@ def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
         star_results.append(res)
 
         ite = time.time()
-        logging.info(f'4:{ite-its}')
+        #logging.debug(f'4:{ite-its}')
         its = time.time()
 
     # sort by estimated flux
@@ -917,7 +917,7 @@ def find_star_HFD(star, image_data, thres=10000, win=100, debugplots=False, debu
     bg = star.bglevel
     #mad = star.bgmad
     estsize = star.estsize/1.5
-    logging.info(f'cx: {xcen} cy: {ycen} - using estsize of {estsize} for profile window')
+    logging.debug(f'cx: {xcen} cy: {ycen} - using estsize of {estsize} for profile window')
 
     img_ht, img_wd = image_data.shape
 
@@ -972,7 +972,7 @@ def measure_stars_in_image(image_data, max_stars=100, thres=10000, debugplots=Fa
             rc = find_star_HFD(star, image_data, thres=thres,
                                debugplots=debugplots, debugfits=debugfits)
 
-            logging.info(f'idx={idx} star = {star} rc = {rc}')
+            logging.debug(f'idx={idx} star = {star} rc = {rc}')
             idx += 1
 
             if rc is None:
@@ -1009,7 +1009,7 @@ def measure_stars_in_image(image_data, max_stars=100, thres=10000, debugplots=Fa
 
         idx = 0
         for star in detected.stars[star_range]:
-            logging.info(f'idx {idx}: cx={star.cx:5.3f} cy={star.cy:5.3f} '
+            logging.debug(f'idx {idx}: cx={star.cx:5.3f} cy={star.cy:5.3f} '
                          f'size={star.estsize:5.3f} hfd={star.hfd:6.3f} '
                          f'flux={star.flux}')
             idx += 1
