@@ -67,16 +67,18 @@ if __name__ == '__main__':
     log_timestamp = datetime.now()
     logfilename = 'capture_vcurve_script-' + log_timestamp.strftime('%Y%m%d%H%M%S') + '.log'
 
+    LONG_FORMAT = '%(asctime)s.%(msecs)03d [%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
+    SHORT_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
 
     logging.basicConfig(filename=logfilename,
                         filemode='w',
                         level=logging.DEBUG,
-                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        format=LONG_FORMAT,
                         datefmt='%Y-%m-%d %H:%M:%S')
 
     # add to screen as well
     log = logging.getLogger()
-    formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+    formatter = logging.Formatter(SHORT_FORMAT)
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)

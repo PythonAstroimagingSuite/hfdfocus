@@ -425,6 +425,7 @@ def parse_commandline():
     parser.add_argument('--forcehw', action='store_true', help='Force connecting to hw in simul mode')
     parser.add_argument('--keepfiles', action='store_true', help='Keep images taken during focusing')
     parser.add_argument('--measurefile', type=str,  help='Measure file and exit')
+    parser.add_argument('--testloop', action='store_true', help='Loop at initial focus forver measuring star')
     parser.add_argument('--testfinal', action='store_true', help='Test final HFD determination')
 
     args = parser.parse_args()
@@ -504,6 +505,8 @@ if __name__ == '__main__':
             ap.read(args.profile)
             logging.debug(f'profile = {ap.equipment}')
             backend_name = ap.equipment.backend.get('name')
+            camera_backend = backend_name
+            focuser_backend = backend_name
             camera_driver = ap.equipment.camera.driver
             #print(dir(ap.equipment.focuser))
             logging.debug(f'ap.equipment.backend = {ap.equipment.backend}')
@@ -529,8 +532,12 @@ if __name__ == '__main__':
             backlash = ap.settings.autofocus.get('backlash', 0)
             final_offset = ap.settings.autofocus.get('final_offset', 0)
         else:
-            focuser_driver = args.focuser
-            camera_driver = args.camera
+            logging.info(f'focuser specified = {args.focuser}')
+            focuser_backend, focuser_driver = args.focuser.split(':')
+            logging.info(f'focuser_backend = {focuser_backend} focuser_driver = {focuser_driver}')
+            logging.info(f'camera specified = {args.camera}')
+            camera_backend, camera_driver = args.camera.split(':')
+            logging.info(f'camera_backend = {camera_backend} camera_driver = {camera_driver}')
             FOCUSER_MIN_POS = args.focus_min
             FOCUSER_MAX_POS = args.focus_max
             FOCUSER_DIR = args.focus_dir
@@ -548,17 +555,17 @@ if __name__ == '__main__':
 
         sdi = SDI()
 
-        sdi.connect_backend(backend_name)
+        #sdi.connect_backend(backend_name)
 
         #focuser = connect_focuser(ASCOM_FOCUS_DRIVER)
         logging.debug(f'Connecting to focuser driver {focuser_driver}')
-        focuser = sdi.connect_focuser(focuser_driver)
+        focuser = sdi.connect_focuser(focuser_driver, backend_name=focuser_backend)
         logging.debug(f'focuser = {focuser}')
         if not focuser:
             logging.error(f'Unabled to connect to focuser driver {focuser_driver}')
             sys.exit(-1)
         logging.debug(f'Connecting to camera driver {camera_driver}')
-        cam = sdi.connect_camera(camera_driver)
+        cam = sdi.connect_camera(camera_driver, backend_name=camera_backend)
         logging.debug(f'cam = {cam}')
         if not cam:
             logging.error(f'Unabled to connect to camera driver {camera_driver}')
@@ -691,27 +698,32 @@ if __name__ == '__main__':
     ntries = 0
     right_side = False
     while ntries < 3:
-        rc_fpos1 = measure_at_focus_pos(fpos_1, focus_expos)
-        if rc_fpos1 is None:
-            hfd_1 = None
-        else:
-            hfd_1, satur, freturn = rc_fpos1
 
-        if hfd_1 is None:
-            logging.error('No star found!')
-            #if args.debugplots:
-            #    plt.show()
-            cleanup_files()
-            logging.info('Exitting!')
-            sys.exit(1)
+        while True:
+            rc_fpos1 = measure_at_focus_pos(fpos_1, focus_expos)
+            if rc_fpos1 is None:
+                hfd_1 = None
+            else:
+                hfd_1, satur, freturn = rc_fpos1
 
-        if args.debugplots:
-            fig.suptitle(f'First focus {fpos_1} HFD {hfd_1:5.2f}')
-#            fig.show()
-#            plt.pause(args.debugplotsdelay)
-            show_fig_and_wait(fig, args.debugplotsdelay)
+            if hfd_1 is None:
+                logging.error('No star found!')
+                #if args.debugplots:
+                #    plt.show()
+                cleanup_files()
+                logging.info('Exitting!')
+                sys.exit(1)
 
-        logging.info(f'INITIAL FOCUS = {fpos_1}  HFD = {hfd_1}')
+            if args.debugplots:
+                fig.suptitle(f'First focus {fpos_1} HFD {hfd_1:5.2f}')
+    #            fig.show()
+    #            plt.pause(args.debugplotsdelay)
+                show_fig_and_wait(fig, args.debugplotsdelay)
+
+            logging.info(f'INITIAL FOCUS = {fpos_1}  HFD = {hfd_1}')
+
+            if not args.testloop:
+                break
 
         # move out 10 HFD
         nsteps = int(abs(10/vslope))
