@@ -17,6 +17,17 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#
+# 2019/12/17
+#
+#  This is an older routine useful by the single star autofocus program
+#  Leaving as is since it works well in that application and I don't want
+#  to destabilize the autofocus functionality
+#
+#  At some point would be good to merge the multistar analysis routines with
+#  the single star since lots of duplicated code
+#
+
 import sys
 import math
 import time

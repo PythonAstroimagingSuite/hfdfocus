@@ -53,11 +53,15 @@ import matplotlib.pyplot as plt
 # copied from pyastroviewer::StarFitHFR!
 
 class StarFitResult:
-    def __init__(self, star_cx, star_cy, star_r, star_f,
-                 nstars, bgest, noiseest, width, height):
+    def __init__(self, star_cx, star_cy, star_r1, star_r2, star_angle,
+                 star_f, nstars, bgest, noiseest, width, height):
         self.star_cx = star_cx
         self.star_cy = star_cy
-        self.star_r = star_r
+        self.star_r1 = star_r1
+        self.star_r2 = star_r2
+        # create a equiv radius for plotting
+        self.star_r = np.sqrt(star_r1*star_r2)
+        self.star_angle = star_angle
         self.star_f = star_f
         self.nstars = nstars
         self.bgest = bgest
@@ -67,51 +71,51 @@ class StarFitResult:
 
     # compute split of stars in different annuli in percentage of image diagonal
 
-    def compute_hfr_in_out(self, r_ex=0, r_in=0.35, r_gap=0.1, r_out=0.9):
+    def compute_starfit_in_out(self, r_ex=0, r_in=0.35, r_gap=0.1, r_out=0.9):
 
-        hfr_result_in = self.filter_range(r_low=r_ex, r_high=r_in)
-        hfr_result_out = self.filter_range(r_low=r_in+r_gap, r_high=r_out)
+        sr_result_in = self.filter_range(r_low=r_ex, r_high=r_in)
+        sr_result_out = self.filter_range(r_low=r_in+r_gap, r_high=r_out)
 
-        if hfr_result_in.nstars > 0:
-            hfr_in = np.median(hfr_result_in.star_r)
+        if sr_result_in.nstars > 0:
+            sr_in = np.median(sr_result_in.star_r)
         else:
-            hfr_in = np.nan
+            sr_in = np.nan
 
-        if hfr_result_out.nstars > 0:
-            hfr_out = np.median(hfr_result_out.star_r)
+        if sr_result_out.nstars > 0:
+            sr_out = np.median(sr_result_out.star_r)
         else:
-            hfr_out = np.nan
+            sr_out = np.nan
 
-        self.hfr_in = hfr_in
-        self.hfr_out = hfr_out
+        self.star_r_in = sr_in
+        self.star_r_out = sr_out
 
         return
 
-        diag2 = (self.width**2+self.height**2)/4
-
-        halfwid = self.width/2
-        halfht  = self.height/2
-
-        thres_ex2 = diag2*r_ex**2
-        thres_in2 = diag2*r_in**2
-        thres_gap2 = diag2*(r_in+r_gap)**2
-        thres_out2 = diag2*r_out**2
-
-        hfr_in = []
-        hfr_out = []
-
-        for x, y, r in zip(self.star_cx, self.star_cy, self.star_r):
-            rad2 = (x-halfwid)**2+(y-halfht)**2
-            if rad2 < thres_ex2:
-                continue
-            if rad2 < thres_in2:
-                hfr_in.append(r)
-                continue
-            if rad2 > thres_gap2 and rad2 < thres_out2:
-                hfr_out.append(r)
-
-        self.hfr_in = np.median(hfr_in)
-        self.hfr_out = np.median(hfr_out)
+#        diag2 = (self.width**2+self.height**2)/4
+#
+#        halfwid = self.width/2
+#        halfht  = self.height/2
+#
+#        thres_ex2 = diag2*r_ex**2
+#        thres_in2 = diag2*r_in**2
+#        thres_gap2 = diag2*(r_in+r_gap)**2
+#        thres_out2 = diag2*r_out**2
+#
+#        hfr_in = []
+#        hfr_out = []
+#
+#        for x, y, r in zip(self.star_cx, self.star_cy, self.star_r):
+#            rad2 = (x-halfwid)**2+(y-halfht)**2
+#            if rad2 < thres_ex2:
+#                continue
+#            if rad2 < thres_in2:
+#                hfr_in.append(r)
+#                continue
+#            if rad2 > thres_gap2 and rad2 < thres_out2:
+#                hfr_out.append(r)
+#
+#        self.hfr_in = np.median(hfr_in)
+#        self.hfr_out = np.median(hfr_out)
 
     # return StarFitResult object with only stars in specified range
     # radius is specified as fraction (0 to 1) of 1/2 diagonal distance
@@ -132,7 +136,9 @@ class StarFitResult:
 
         return StarFitResult(self.star_cx[valid_r_idx],
                              self.star_cy[valid_r_idx],
-                             self.star_r[valid_r_idx],
+                             self.star_r1[valid_r_idx],
+                             self.star_r2[valid_r_idx],
+                             self.star_angle[valid_r_idx],
                              self.star_f[valid_r_idx],
                              valid_r_idx[0].shape[0],
                              self.bgest,
@@ -145,6 +151,23 @@ class StarInfo:
     """
     Container for information about a single detected star.
 
+    Stellar profiles are characterized by an ellipse:
+
+        r1, r2        Major/minor exis
+        angle         Orientation of ellipse
+
+    An example is a half flux radius which measures the radius at which half of the
+    total flux of the star is contained.  In this case:
+
+        r1 = r2 = half flux radius
+        angle = 0 (arbirtrary since it is a circle)
+
+    Another would be fitting a 2D Gaussian in which case:
+
+        r1 = sigma_1
+        r2 = sigma_2
+        angle = orientation
+
     Attributes:
         cx:                Centroid X
         cy:                Centroid Y
@@ -152,7 +175,9 @@ class StarInfo:
         bgmad:             Background MAD at star
         estsize:           Estimated size in pixels of detected blob - NOT HFD measurement!
         estflux:           Estimated flux from detected blob - NOT precise!
-        hfd:               HFD
+        r1:                Major axis
+        r2:                Minor axis
+        angle:             Orientation of major axis
         flux:              HFD derived flux measurement
         alone:             Whether another star was nearby
     """
@@ -162,7 +187,9 @@ class StarInfo:
     bgmad: float
     estsize: float
     estflux: float
-    hfd: float
+    r1: float
+    r2: float
+    angle: float
     flux: float
     alone: bool
 
@@ -399,6 +426,8 @@ def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
                 star_model[yl:ym, xl:xm] = bgrem_data[yl:ym, xl:xm] > thres
     else:
         thres = compute_median(bgrem_data) + bgfact*compute_noise_level(bgrem_data)
+        logging.debug(f'bgrem_data median = {compute_median(bgrem_data)}, bgfact = {bgfact}, '
+                      f'noise = {compute_noise_level(bgrem_data)}')
         logging.debug(f'Using constant thres for star model = {thres}')
         star_model = bgrem_data > thres
 
@@ -551,7 +580,7 @@ def detect_stars(image_data, max_stars=100, bgfact=50, satur=50000, window=100,
         #logging.debug(f'3:{ite-its}')
         its = time.time()
 
-        res = StarInfo(cx, cy, bglevel, bgmad, estsize, estflux, None, None, alone)
+        res = StarInfo(cx, cy, bglevel, bgmad, estsize, estflux, None, None, None, None, alone)
 
         star_results.append(res)
 
@@ -846,7 +875,8 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
             fig2 = plt.figure()
             ax_4 = fig2.add_subplot(111)
             ax_4.plot(np.arange(lidx_low,ridx_hi), profile[lidx_low:ridx_hi])
-            plt.show()
+            #plt.show()
+            plt.pause(0.1)
         return None
 
     # now find flux inside left/right
@@ -916,7 +946,7 @@ def find_star_HFD(star, image_data, thres=10000, win=100, debugplots=False, debu
     ycen = star.cy
     bg = star.bglevel
     #mad = star.bgmad
-    estsize = star.estsize/1.5
+    estsize = star.estsize
     logging.debug(f'cx: {xcen} cy: {ycen} - using estsize of {estsize} for profile window')
 
     img_ht, img_wd = image_data.shape
@@ -937,12 +967,13 @@ def find_star_HFD(star, image_data, thres=10000, win=100, debugplots=False, debu
 
     profile = horiz_bin_window(crop_data, bg=bg)
 
-    logging.debug(f'thres = {thres}')
-    logging.debug(f'profile = {profile}')
-
     bg_est = np.median(profile)
     max_est = np.max(profile)
-    thres = bg_est + 0.05*(max_est-bg_est)
+    #thres = bg_est + 0.005*(max_est-bg_est)
+    thres = 0.025*max_est
+
+    logging.debug(f'thres = {thres}')
+    logging.debug(f'profile = {profile}')
 
     if debugplots:
         ax_1d.plot(profile)
@@ -953,14 +984,87 @@ def find_star_HFD(star, image_data, thres=10000, win=100, debugplots=False, debu
         plt.draw()
         #plt.pause(3333)
 
-    return find_hfd_from_1D(profile, thres=thres)
+    rc = find_hfd_from_1D(profile, thres=thres, debugplots=debugplots)
 
-def measure_stars_in_image(image_data, max_stars=100, thres=10000, debugplots=False, debugfits=False):
+    logging.debug(f'return from find_hfd_from_1D is {rc}')
+    if rc is None:
+        return None
 
-    bg = 800
-    thres = 10000
+    cidx, lx, rx, lr, rr, totflux = rc
+    hfd = rr - lr
 
-    detected = detect_stars(image_data, max_stars=max_stars, debugfits=debugfits)
+#    star.hfd = hfd
+#    star.flux = totflux
+
+    if debugplots:
+        ax_1d.axvline(cidx, color='red')
+        if lx is not None and rx is not None:
+            ax_1d.axvline(lx, color='green')
+            ax_1d.axvline(rx, color='green')
+            ax_1d.axvline(lr, color='blue')
+            ax_1d.axvline(rr, color='blue')
+            delta = rx-lx
+            ax_1d.set_xlim(lx-delta/4, rx+delta/4)
+
+        #fig.show()
+        plt.pause(0.1)
+
+    return (hfd, hfd, 0, totflux)
+
+def measure_stars_in_image(image_data, star_fit_fn, max_stars=100, bgfact=50,
+                           window=7, thres=10000, debugplots=False, debugfits=False):
+    """
+    Detects stars in image then runs the spcecifed algorithm to fit the stellar
+    profiles.
+
+    Accepts:
+        image_data : 2D ndarray        image data
+        star_fit_fn : function         function to determine stellar profile fit
+        max_stars : int                Maximum number of stars to fit
+        bgfact : float                 Used to determine threshold (not used by all func)
+        window : int                   Size of fitting window (not used by all func)
+        thres : float                  Threshold (not used by all func)
+        debugplots : bool              True for diagnostic plots
+        debugfits : bool               True for diagnostic FITS files
+
+    The stars are processed in order from the one with most flux to least.  Stars
+    are processed until max_stars stars have been reached or no more stars are left.
+
+    The bgfact, window, and thres parameters exist historically due to the evolution
+    of stellar profile fitting algorithms so each algorithm doesn't require all to work.
+    Check the docs for the function in question for more details.
+
+    The star_fit_fn() should accept a parameter list like:
+
+        func(star, image_data, thres=thres, debugplots, debugfits)
+
+        where:
+
+            star : StarInfo             parameters of potential star from detect_stars
+            image_data : 2D ndarray     original image data
+            thres : float               Threshold for pixel to be considered part of star
+            debugplots : bool           True for diagnostic plots
+            debugfits : bool            True for diagnostic FITS files
+
+        returns:
+            Tuple containing:
+                r1 : float              Major axis
+                r2 : float              Minor axis
+                angle : float           Orienation of major axis
+                flux : float            Total counts in star profile
+
+            or None if fit unsuccessful.
+
+    See the documentation for StarInfo for more information about
+    how stellar profile fits are characterized by a major and minor axis and an angle.
+
+    """
+
+    #bg = 800
+    #thres = 10000
+
+    detected = detect_stars(image_data, max_stars=max_stars,
+                            bgfact=bgfact, debugfits=debugfits)
 
     if detected is not None and len(detected.stars) > 0:
         idx = 0
@@ -968,8 +1072,8 @@ def measure_stars_in_image(image_data, max_stars=100, thres=10000, debugplots=Fa
         star_range = slice(0,len(detected.stars))
         #star_range = slice(0, 5)
         for star in detected.stars[star_range]:
-
-            rc = find_star_HFD(star, image_data, thres=thres,
+            star.idx = idx
+            rc = star_fit_fn(star, image_data, thres=thres,
                                debugplots=debugplots, debugfits=debugfits)
 
             logging.debug(f'idx={idx} star = {star} rc = {rc}')
@@ -980,42 +1084,30 @@ def measure_stars_in_image(image_data, max_stars=100, thres=10000, debugplots=Fa
                 removed_stars.append(star)
                 continue
 
-            cidx, lx, rx, lr, rr, totflux = rc
-            hfd = rr - lr
+            star.r1 = rc[0]
+            star.r2 = rc[1]
+            star.angle = rc[2]
+            star.flux = rc[3]
 
-            star.hfd = hfd
-            star.flux = totflux
+#            if debugplots:
+#                fig.suptitle(f'idx={idx} cx={star.cx:5.3f} cy={star.cy:5.3f} '
+#                             f'R1 {star.r1:5.2f} R2 {star.r2:5.2f} A {star.angle:5.2f}')
 
-            if debugplots:
-                #hfw = 2*(hfr-hfl)
-                #hfc = (hfr+hfl)/2
-                #ax_1d.set_xlim(hfc-hfw, hfc+hfw)
-                fig.suptitle(f'idx={idx} cx={star.cx:5.3f} cy={star.cy:5.3f} HFD {hfd:5.2f}')
-
-                ax_1d.axvline(cidx, color='red')
-                if lx is not None and rx is not None:
-                    ax_1d.axvline(lx, color='green')
-                    ax_1d.axvline(rx, color='green')
-                    ax_1d.axvline(lr, color='blue')
-                    ax_1d.axvline(rr, color='blue')
-                    delta = rx-lx
-                    ax_1d.set_xlim(lx-delta/4, rx+delta/4)
-
-                fig.show()
-                #plt.pause(1)
 
         for star in removed_stars:
             detected.stars.remove(star)
 
         idx = 0
         for star in detected.stars[star_range]:
+            print(star)
             logging.debug(f'idx {idx}: cx={star.cx:5.3f} cy={star.cy:5.3f} '
-                         f'size={star.estsize:5.3f} hfd={star.hfd:6.3f} '
+                         f'size={star.estsize:5.3f} r1={star.r1:6.3f} '
+                         f'r2={star.r2:6.3f} angle={star.angle:4.1f} '
                          f'flux={star.flux}')
             idx += 1
 
-        if debugplots:
-            plt.show(block=True)
+#        if debugplots:
+#            plt.show(block=True)
 
     return detected
 
@@ -1023,17 +1115,21 @@ def measure_stars_in_image(image_data, max_stars=100, thres=10000, debugplots=Fa
 def star_fit_hfr(image_data, max_stars=100, bgfact=50, satur=50000, window=7,
                  debugfits=False):
 
-    detected = measure_stars_in_image(image_data, max_stars=max_stars)
+    detected = measure_stars_in_image(image_data, find_star_HFD,
+                                      max_stars=max_stars, window=window,
+                                      bgfact=bgfact, debugfits=debugfits)
 
     if detected is not None:
         star_cx = np.array([x.cx for x in detected.stars])
         star_cy = np.array([x.cy for x in detected.stars])
-        star_r = np.array([x.hfd for x in detected.stars])
+        star_r1 = np.array([x.r1 for x in detected.stars])
+        star_r2 = np.array([x.r2 for x in detected.stars])
+        star_angle = np.array([x.angle for x in detected.stars])
         star_f = np.array([x.flux for x in detected.stars])
         print(star_cx)
         ht, wd = image_data.shape
-        result = StarFitResult(star_cx, star_cy, star_r, star_f, len(star_cx),
-                               0, 0, wd, ht)
+        result = StarFitResult(star_cx, star_cy, star_r1, star_r2, star_angle,
+                               star_f, len(star_cx), 0, 0, wd, ht)
     else:
         result = None
 
