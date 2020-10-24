@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(filename=logfilename,
                         filemode='w',
-                        level=logging.DEBUG,
+                        level=logging.INFO,
                         format=LONG_FORMAT,
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -100,12 +100,14 @@ if __name__ == '__main__':
         logging.info(f'focuser = {focuser}')
         if not focuser:
             logging.error(f'Unabled to connect to focuser driver {args.focuser_driver}')
+            sys.exit(1)
 
         logging.info(f'Connecting to camera driver {args.camera_driver}')
         cam = sdi.connect_camera(args.camera_driver)
         logging.info(f'cam = {cam}')
         if not cam:
             logging.error(f'Unabled to connect to camera driver {args.camera_driver}')
+            sys.exit(1)
     else:
         simul_star = C8_F7_Star_Simulator(companion_offset=(20, 20), companion_flux_ratio=1.0)
 
@@ -141,7 +143,7 @@ if __name__ == '__main__':
                 ax_1d = fig.add_subplot(122)
 
         # figure out direction
-        backlash = 350
+        backlash = 250
         logging.info(f'Shifting focus center by runoffset = {args.runoffset}')
         focus_low = int(focus_center+args.runoffset-focus_range/2)
         focus_high = focus_low + args.focus_range
@@ -205,7 +207,7 @@ if __name__ == '__main__':
 
                     logging.info(f'Taking exposure exposure = {focus_expos} seconds roi = {roi}')
 
-                    rc = sdi.take_exposure(cam, focus_expos, imgname, roi=roi)
+                    rc = sdi.take_exposure(cam, focus_expos, imgname, roi=roi, overwrite=True)
 
                     logging.info(f'exposure result code = {rc}')
 
