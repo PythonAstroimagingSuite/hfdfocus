@@ -1,3 +1,21 @@
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import os
 import re
 import time
@@ -42,12 +60,12 @@ if __name__ == '__main__':
 #    logging.info(f'command args = {args}')
 
     if args.debugplots:
-        fig = plt.figure(figsize=(4.5,2))
+        fig = plt.figure(figsize=(4.5, 2))
         ax_2d = fig.add_subplot(121)
         ax_1d = fig.add_subplot(122)
-        fig2 = plt.figure(figsize=(4,3))
+        fig2 = plt.figure(figsize=(4, 3))
         ax_hfd = fig2.add_subplot(111)
-        hfd_plot, = ax_hfd.plot([],[], marker='o', fillstyle='none', ls='')
+        hfd_plot, = ax_hfd.plot([], [], marker='o', fillstyle='none', ls='')
 
     run = 1
     fit_arr = []
@@ -79,10 +97,10 @@ if __name__ == '__main__':
             xcen, ycen, bg, mad, starmask, alon = find_star(image_data, debugfits=False)
 
             win = 100
-            xlow = int(xcen-win/2)
-            xhi = int(xcen+win/2)
-            ylow = int(ycen-win/2)
-            yhi = int(ycen+win/2)
+            xlow = int(xcen - win / 2)
+            xhi = int(xcen + win / 2)
+            ylow = int(ycen - win / 2)
+            yhi = int(ycen + win / 2)
             crop_data = image_data[ylow:yhi, xlow:xhi]
 
             if args.debugplots:
@@ -91,7 +109,7 @@ if __name__ == '__main__':
                 #mpl.rcParams.update({'axes.labelsize' : 18})
                 ax_1d = fig.add_subplot(121)
                 ax_2d = fig.add_subplot(122)
-                im = ax_2d.imshow((crop_data-bg).astype(float))
+                im = ax_2d.imshow((crop_data - bg).astype(float))
                 fig.colorbar(im, ax=ax_2d)
 
             profile = horiz_bin_window(crop_data, bg=bg)
@@ -111,13 +129,13 @@ if __name__ == '__main__':
                     ax_1d.axvline(sr, color='green')
                     ax_1d.axvline(hfl, color='blue')
                     ax_1d.axvline(hfr, color='blue')
-                    delta = sr-sl
+                    delta = sr - sl
                     ax_1d.set_xlim(sl-delta/4, sr+delta/4)
 
             #print('total counts = ', np.sum(crop_data-bg))
 
             fpos_arr.append(focus_pos)
-            hfd_arr.append(hfr-hfl)
+            hfd_arr.append(hfr - hfl)
             logging.info(f'{fpos_arr} {hfd_arr}')
 
             if args.debugplots:
@@ -141,10 +159,10 @@ if __name__ == '__main__':
         focus_center = fpos_arr[midx]
         logging.info(f'Set new focus center to {focus_center}')
 
-        fpos_arr_l = np.array(fpos_arr[:midx-2])
-        fpos_arr_r = np.array(fpos_arr[midx+3:])
-        hfd_arr_l = np.array(hfd_arr[:midx-2])
-        hfd_arr_r = np.array(hfd_arr[midx+3:])
+        fpos_arr_l = np.array(fpos_arr[:midx - 2])
+        fpos_arr_r = np.array(fpos_arr[midx + 3:])
+        hfd_arr_l = np.array(hfd_arr[:midx - 2])
+        hfd_arr_r = np.array(hfd_arr[midx + 3:])
 
         # apply threshold
         l_hfd_filter = np.where(hfd_arr_l > args.hfdcutoff)
@@ -161,9 +179,9 @@ if __name__ == '__main__':
 
         siegel_left_fit = siegelslopes(hfd_arr_l, fpos_arr_l)
         siegel_right_fit = siegelslopes(hfd_arr_r, fpos_arr_r)
-        siegel_left_zero = -siegel_left_fit[1]/siegel_left_fit[0]
-        siegel_right_zero = -siegel_right_fit[1]/siegel_right_fit[0]
-        siegel_best_pos = (siegel_left_fit[1]-siegel_right_fit[1])/(siegel_right_fit[0]-siegel_left_fit[0])
+        siegel_left_zero = -siegel_left_fit[1] / siegel_left_fit[0]
+        siegel_right_zero = -siegel_right_fit[1] / siegel_right_fit[0]
+        siegel_best_pos = (siegel_left_fit[1] - siegel_right_fit[1]) / (siegel_right_fit[0] - siegel_left_fit[0])
         logging.info(f'siegel left  fit = {siegel_left_fit}')
         logging.info(f'siegel right fit = {siegel_right_fit}')
         logging.info(f'siegel best pos  = {siegel_best_pos}')
@@ -171,8 +189,8 @@ if __name__ == '__main__':
         if args.debugplots:
             ax_hfd.plot(fpos_arr_l, hfd_arr_l, marker='+', ls='', color='red')
             ax_hfd.plot(fpos_arr_r, hfd_arr_r, marker='+', ls='', color='red')
-            ax_hfd.plot(fpos_arr[midx-5:], siegel_right_fit[0]*fpos_arr[midx-5:]+siegel_right_fit[1], color='green')
-            ax_hfd.plot(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1], color='blue')
+            ax_hfd.plot(fpos_arr[midx - 5:], siegel_right_fit[0] * fpos_arr[midx  -5:] + siegel_right_fit[1], color='green')
+            ax_hfd.plot(fpos_arr[:midx + 5], siegel_left_fit[0] * fpos_arr[:midx + 5] + siegel_left_fit[1], color='blue')
             ax_hfd.axvline(siegel_best_pos, color='red')
             ax_hfd.set_title(f'Left {siegel_left_fit[0]:7.6f}/{siegel_best_pos - siegel_left_zero:5.3f} Right {siegel_right_fit[0]:7.6f}/{siegel_best_pos - siegel_right_zero:5.3f}')
             ax_hfd.relim()
@@ -183,7 +201,7 @@ if __name__ == '__main__':
 
         fit_arr.append((siegel_left_fit[0], siegel_best_pos - siegel_left_zero, siegel_right_fit[0], siegel_best_pos - siegel_right_zero))
 
-        print(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1])
+        print(fpos_arr[:midx + 5], siegel_left_fit[0] * fpos_arr[:midx + 5] + siegel_left_fit[1])
 
         logging.info('Left Side:')
         logging.info(f'   slope: {siegel_left_fit[0]}')

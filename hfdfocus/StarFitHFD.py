@@ -1,10 +1,10 @@
 #
 # star fitting routines
 #
-# Copyright 2019 Michael Fulbright
+# Copyright 2020 Michael Fulbright
 #
 #
-#    This program is free software: you can redistribute it and/or modify
+#    hfdfocus is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
@@ -16,6 +16,8 @@
 #
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 
 #
 # 2019/12/17
@@ -65,11 +67,11 @@ def compute_bg_model(image, window):
     bgmodel = np.empty_like(image)
     for y in range(0, ht, window):
         yl = y
-        ym = min(ht-1, yl+window)
+        ym = min(ht - 1, yl + window)
 
         for x in range(0, wd, window):
             xl = x
-            xm = min(wd-1, xl+window)
+            xm = min(wd - 1, xl + window)
 
 #            print(f'sample range y={yl}:{ym}  x={xl}:{xm} median=', np.median(image[yl:ym, xl:xm]))
 
@@ -179,11 +181,11 @@ def find_centroid(image_data, thres):
     iidx = iidx + 0.5
     jidx = jidx + 0.5
 
-    wsum_i =(iidx*(image_data)).sum()
-    wsum_j = (jidx*(image_data)).sum()
+    wsum_i = (iidx * (image_data)).sum()
+    wsum_j = (jidx * (image_data)).sum()
 
-    ci = wsum_i/total
-    cj = wsum_j/total
+    ci = wsum_i / total
+    cj = wsum_j / total
 
     return (ci, cj)
 
@@ -248,20 +250,20 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     if starmodel:
         for y in range(0, ht, bg_window):
             yl = y
-            ym = min(ht-1, yl+bg_window)
+            ym = min(ht - 1, yl + bg_window)
 
             for x in range(0, wd, bg_window):
                 xl = x
-                xm = min(wd-1, xl+bg_window)
+                xm = min(wd - 1, xl + bg_window)
 
                 data = bgrem_data[yl:ym, xl:xm]
                 data_med = np.median(data)
                 data_mad = compute_noise_level(data)
 
-                thres = data_med + bgfact*data_mad
+                thres = data_med + bgfact * data_mad
                 star_model[yl:ym, xl:xm] = bgrem_data[yl:ym, xl:xm] > thres
     else:
-        thres = compute_median(bgrem_data) + bgfact*compute_noise_level(bgrem_data)
+        thres = compute_median(bgrem_data) + bgfact * compute_noise_level(bgrem_data)
         logging.debug(f'Using constant thres for star model = {thres}')
         star_model = bgrem_data > thres
 
@@ -269,7 +271,8 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     logging.debug(f'computing star_model DONE took {te-ts} seconds')
 
     if debugfits:
-        pyfits.writeto(f'star_model_bgfact{bgfact}.fits', star_model.astype(float), overwrite=True)
+        pyfits.writeto(f'star_model_bgfact{bgfact}.fits',
+                       star_model.astype(float), overwrite=True)
 
     # use dilation to stregthen any structures
     ndilate = 3
@@ -278,13 +281,14 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     ts = time.time()
     for i in range(0, ndilate):
         #tmp_image = ndimage.grey_dilation(tmp_image, size=(3,3))
-        tmp_image = ndimage.binary_dilation(tmp_image, np.ones((3,3)))
+        tmp_image = ndimage.binary_dilation(tmp_image, np.ones((3, 3)))
     te = time.time()
     logging.debug(f'computing dilation took {te-ts} seconds')
 
     dilate_star_model = tmp_image
     if debugfits:
-        pyfits.writeto(f'dilate_tar_model_bgfact{bgfact}.fits', dilate_star_model.astype(float), overwrite=True)
+        pyfits.writeto(f'dilate_tar_model_bgfact{bgfact}.fits',
+                       dilate_star_model.astype(float), overwrite=True)
 
     # find structures
     star_label, nstars = ndimage.measurements.label(dilate_star_model)
@@ -297,9 +301,9 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     star_boxes = np.zeros_like(star_model)
     max_pix = 0
     max_l = None
-    for l in ndimage.find_objects(star_label):
+    for lab in ndimage.find_objects(star_label):
         #print(f'l={l}')
-        npix = (l[0].stop-l[0].start)*(l[1].stop-l[1].start)
+        npix = (lab[0].stop - lab[0].start) * (lab[1].stop - lab[1].start)
         #print(bgrem_data[l].shape, npix)
 
         if npix < 9:
@@ -312,25 +316,25 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
 
         if npix > max_pix:
             max_pix = npix
-            max_l = l
+            max_l = lab
 
     if max_l is None:
         logging.error('find_star(): no object found')
         return None
 
     # see if another object is within window centered on main object
-    npix_max_l = (max_l[0].stop-max_l[0].start)*(max_l[1].stop-max_l[1].start)
+    npix_max_l = (max_l[0].stop - max_l[0].start) * (max_l[1].stop - max_l[1].start)
     alone = True
     logging.debug('looking for nearby stars')
-    for l in ndimage.find_objects(star_label):
-        npix = (l[0].stop-l[0].start)*(l[1].stop-l[1].start)
-        logging.debug(f'{max_l}, {l}, {npix_max_l}, {npix}')
-        if l[0].start == max_l[0].start and l[1].start == max_l[1].start and \
-           l[0].stop == max_l[0].stop and l[1].stop == max_l[1].stop:
+    for lab in ndimage.find_objects(star_label):
+        npix = (lab[0].stop - lab[0].start) * (lab[1].stop - lab[1].start)
+        logging.debug(f'{max_l}, {lab}, {npix_max_l}, {npix}')
+        if lab[0].start == max_l[0].start and lab[1].start == max_l[1].start and \
+           lab[0].stop == max_l[0].stop and lab[1].stop == max_l[1].stop:
                logging.debug('skipping is original label')
                continue
 
-        if npix > max_pix/2:
+        if npix > max_pix / 2:
             alone = False
             break
 
@@ -359,13 +363,13 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
     axes = get_major_minor_axes(dilate_star_model[max_l])
     majax = axes[0][2]
     minax = axes[1][2]
-    ecc = math.sqrt(1.0-(minax/majax)**2)
+    ecc = math.sqrt(1.0 - (minax / majax)**2)
     logging.debug(f'Major/Minor/Ecc = {majax} {minax} {ecc}')
 
     if ecc > 0.75:
-        logging.warning(f'fERROR find_star(): Eccentricity {ecc} is outside acceptable range - probably not alone')
+        logging.warning(f'fERROR find_star(): Eccentricity {ecc} is outside '
+                        'acceptable range - probably not alone')
         alone = False
-
 
     cy, cx = ndimage.measurements.center_of_mass(star_boxes)
     logging.debug(f'COM cx, cy = {cx}, {cy}')
@@ -374,10 +378,10 @@ def find_star(image_data, bgfact=50, satur=50000, window=100,
 
     # compute background near star
     #
-    yl = max(0, int(cy)-bg_window)
-    ym = min(ht-1, yl+bg_window)
-    xl = max(0, int(cx)-bg_window)
-    xm = min(wd-1, xl+bg_window)
+    yl = max(0, int(cy) - bg_window)
+    ym = min(ht - 1, yl + bg_window)
+    xl = max(0, int(cx) - bg_window)
+    xm = min(wd - 1, xl + bg_window)
     #print('xl/xm/yl/xm=', xl, xm, yl, ym)
     data = bgmodel[yl:ym, xl:xm]
     bglevel = np.median(data)
@@ -406,7 +410,7 @@ def horiz_bin_window(data, bg=0):
 
     ni, nj = data.shape
 
-    profile = np.sum(data-bg, axis=0)
+    profile = np.sum(data - bg, axis=0)
 
 #    print(data)
 #    print(profile)
@@ -430,9 +434,9 @@ def find_star_limits_robust_from_edges(profile, thres=0):
     left = None
     right = None
     idx = 0
-    while idx < len(profile)-2:
+    while idx < len(profile) - 2:
         #print('l', idx, profile[idx], profile[idx+1], thres)
-        if profile[idx+1] >= thres and profile[idx] < thres:
+        if profile[idx + 1] >= thres and profile[idx] < thres:
             left = idx
             break
         idx += 1
@@ -440,11 +444,11 @@ def find_star_limits_robust_from_edges(profile, thres=0):
     if left is None:
         return None, None
 
-    idx = len(profile)-2
-    while idx > left+2:
+    idx = len(profile) - 2
+    while idx > left + 2:
         #print('r', idx, profile[idx], profile[idx-1], thres)
-        if profile[idx-1] >= thres and profile[idx] < thres:
-            right = idx-1
+        if profile[idx - 1] >= thres and profile[idx] < thres:
+            right = idx - 1
             break
         idx -= 1
 
@@ -474,22 +478,22 @@ def find_star_limits_robust_from_center(profile, thres=0):
 
     # check to left first
     #logging.debug('Finding left')
-    idx = int(len(profile)/2)
+    idx = int(len(profile) / 2)
     while idx > 1:
         #logging.debug(f'{idx} {thres} {profile[idx]} {profile[idx-1]}')
-        if profile[idx] >= thres and profile[idx-1] < thres:
-            left = idx-1
+        if profile[idx] >= thres and profile[idx - 1] < thres:
+            left = idx - 1
             break
         idx -= 1
 
     if left is None:
         return None, None
 
-    idx = int(len(profile)/2)
+    idx = int(len(profile) / 2)
     #logging.debug('Finding right')
-    while idx < len(profile)-2:
+    while idx < len(profile) - 2:
         #logging.debug(f'{idx} {thres} {profile[idx]} {profile[idx+1]}')
-        if profile[idx] >= thres and profile[idx+1] < thres:
+        if profile[idx] >= thres and profile[idx + 1] < thres:
             right = idx
             break
         idx += 1
@@ -540,8 +544,8 @@ def find_star_limits_robust_from_max_region(profile, thres=0):
 
     logging.debug(f'max region {maxreg.start} {maxreg.stop} {maxsum}')
 
-    left = maxreg.start-1
-    right = maxreg.stop-1
+    left = maxreg.start - 1
+    right = maxreg.stop - 1
 
     return left, right
 
@@ -584,7 +588,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
 
     # different way
     def flux2(proffunc, rlo, rhi):
-        nr = 2**7+1
+        nr = 2**7 + 1
         rvals, dr = np.linspace(rlo, rhi, num=nr, retstep=True)
         fvals = proffunc(rvals)
         return romb(fvals, dr)
@@ -607,16 +611,16 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     if lidx is None or ridx is None:
         return None
 
-    cidx = np.sum(idx[lidx:ridx]*profile[lidx:ridx])/np.sum(profile[lidx:ridx])
+    cidx = np.sum(idx[lidx:ridx] * profile[lidx:ridx]) / np.sum(profile[lidx:ridx])
     logging.debug(f'center = {cidx}')
 
     # find left, right limits
     # invert profile as y as a function of x on left and right
     # sides of the profile
     lidx_low = int(lidx)
-    lidx_hi = int(lidx+2)
+    lidx_hi = int(lidx + 2)
     ridx_low = int(ridx)
-    ridx_hi = int(ridx+2)
+    ridx_hi = int(ridx + 2)
 #    print(lidx, lidx_low, lidx_hi, ridx, ridx_low, ridx_hi)
 #    print(profile[lidx_low:lidx_hi], idx[lidx_low:lidx_hi])
 #    print(profile[ridx_low:ridx_hi], idx[ridx_low:ridx_hi])
@@ -649,7 +653,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
         if debugplots:
             fig2 = plt.figure()
             ax_4 = fig2.add_subplot(111)
-            ax_4.plot(np.arange(lidx_low,ridx_hi), profile[lidx_low:ridx_hi])
+            ax_4.plot(np.arange(lidx_low, ridx_hi), profile[lidx_low:ridx_hi])
             plt.show()
         return None
 
@@ -662,7 +666,7 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
     logging.debug(f'integrated flux in star = {totflux}')
 
     # compute flux as function of distance from center
-    r_max = min(cidx-lx, rx-cidx)
+    r_max = min(cidx - lx, rx - cidx)
 
     r_arr = []
     #flux_vs_r = []
@@ -693,8 +697,9 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
             ax_3.plot(r_arr, flux2_vs_r)
         #plt.show()
 
-        half_flux_r = flux_inv(totflux/2)
+        half_flux_r = flux_inv(totflux / 2)
     except:
+        # FIXME Need tighter exception specification
         logging.error('Error finding half flux rad!', exc_info=True)
         return None
 
@@ -707,9 +712,10 @@ def find_hfd_from_1D(profile, thres=0, debugplots=False):
         ax_3.axvline(half_flux_r, color='green')
         #plt.pause(15)
 
-    return (cidx, lx, rx, cidx-half_flux_r, cidx+half_flux_r, totflux)
+    return (cidx, lx, rx, cidx - half_flux_r, cidx + half_flux_r, totflux)
 
-def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, debugfits=False):
+def find_brightest_star_HFD(image_data, thres=10000, win=100,
+                            debugplots=False, debugfits=False):
     """
     Given image data find brightest star and compute HFD.
 
@@ -735,22 +741,21 @@ def find_brightest_star_HFD(image_data, thres=10000, win=100, debugplots=False, 
 #        "half flux" limits, total flux in star profile, and a flag of whether the
 #        star was alone or not.
 
-
     xcen, ycen, bg, noise, starmask, alone = find_star(image_data, debugfits=debugfits)
 
     img_ht, img_wd = image_data.shape
 
-    xlow = max(0, int(xcen-win/2))
-    xhi = min(img_wd-1, int(xcen+win/2))
-    ylow = max(0, int(ycen-win/2))
-    yhi = min(img_ht-1, int(ycen+win/2))
+    xlow = max(0, int(xcen - win / 2))
+    xhi = min(img_wd - 1, int(xcen + win / 2))
+    ylow = max(0, int(ycen - win / 2))
+    yhi = min(img_ht - 1, int(ycen + win / 2))
     crop_data = image_data[ylow:yhi, xlow:xhi]
 
     if debugplots:
         fig = plt.figure()
         ax_2d = fig.add_subplot(121)
         ax_1d = fig.add_subplot(122)
-        im = ax_2d.imshow((crop_data-bg).astype(float))
+        im = ax_2d.imshow((crop_data - bg).astype(float))
         fig.colorbar(im, ax=ax_2d)
 
     profile = horiz_bin_window(crop_data, bg=bg)
@@ -771,27 +776,27 @@ def test_1d_with_gaussian():
     sigma_x = 10
     sigma_y = sigma_x
     size = 45
-    peak = 200000/sigma_x/sigma_y/2/np.pi
+    peak = 200000 / sigma_x / sigma_y / 2 / np.pi
     bg = 800
     bgnoise = 50
-    thres = math.sqrt(size)*5*bgnoise
+    thres = math.sqrt(size) * 5 * bgnoise
 
-    x = np.linspace(-size/2, size/2, size)
-    y = np.linspace(-size/2, size/2, size)
+    x = np.linspace(-size / 2, size / 2, size)
+    y = np.linspace(-size / 2, size / 2, size)
 
     x, y = np.meshgrid(x, y)
     #z = (1/(2*np.pi*sigma_x*sigma_y) * np.exp(-(x**2/(2*sigma_x**2)
     #     + y**2/(2*sigma_y**2))))
-    z = (peak * np.exp(-(x**2/(2*sigma_x**2)
-         + y**2/(2*sigma_y**2))))
-    z[np.where((x**2+y**2) < 3)] = 0
+    z = (peak * np.exp(-(x**2/(2 * sigma_x**2)
+         + y**2 / (2 * sigma_y**2))))
+    z[np.where((x**2 + y**2) < 3)] = 0
     z += np.random.normal(loc=bg, scale=bgnoise, size=z.shape)
 
     #plt.contourf(x, y, z, cmap='Blues')
     fig = plt.figure()
     ax_2d = fig.add_subplot(121)
     ax_1d = fig.add_subplot(122)
-    im = ax_2d.imshow(z-peak)
+    im = ax_2d.imshow(z - peak)
     fig.colorbar(im, ax=ax_2d)
 
     profile = horiz_bin_window(z, bg=bg)
@@ -813,9 +818,6 @@ def test_1d_with_gaussian():
     plt.show()
 
     sys.exit(1)
-
-
-
 
 
 if __name__ == '__main__':
@@ -855,17 +857,17 @@ if __name__ == '__main__':
     xcen, ycen = find_star(image_data, debugfits=False)
 
     win = 100
-    xlow = int(xcen-win/2)
-    xhi = int(xcen+win/2)
-    ylow = int(ycen-win/2)
-    yhi = int(ycen+win/2)
+    xlow = int(xcen - win / 2)
+    xhi = int(xcen + win / 2)
+    ylow = int(ycen - win / 2)
+    yhi = int(ycen + win / 2)
     crop_data = image_data[ylow:yhi, xlow:xhi]
 
     if args.debugplots:
         fig = plt.figure()
         ax_2d = fig.add_subplot(121)
         ax_1d = fig.add_subplot(122)
-        im = ax_2d.imshow((crop_data-bg).astype(float))
+        im = ax_2d.imshow((crop_data - bg).astype(float))
         fig.colorbar(im, ax=ax_2d)
 
     profile = horiz_bin_window(crop_data, bg=bg)
@@ -885,10 +887,10 @@ if __name__ == '__main__':
             ax_1d.axvline(sr, color='green')
             ax_1d.axvline(hfl, color='blue')
             ax_1d.axvline(hfr, color='blue')
-            delta = sr-sl
-            ax_1d.set_xlim(sl-delta/4, sr+delta/4)
+            delta = sr - sl
+            ax_1d.set_xlim(sl - delta / 4, sr + delta / 4)
 
-    print('total counts = ', np.sum(crop_data-bg))
+    print('total counts = ', np.sum(crop_data - bg))
 
     if args.debugplots:
         plt.show()

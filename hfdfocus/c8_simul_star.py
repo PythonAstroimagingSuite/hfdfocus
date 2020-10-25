@@ -1,5 +1,23 @@
 # simulate C8 @ f/7 star based on v curve data
 #
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+
 #
 #Fit:
 #
@@ -47,18 +65,18 @@ def shrink_star(starimage_data, bgimage_data, reduction):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         shrunk_star_data = ndimage.zoom(starimage_data,
-                                    [reduction, reduction],
-                                    order=0, mode='constant')#, anti_aliasing=True)
+                                        [reduction, reduction],
+                                        order=0, mode='constant')#, anti_aliasing=True)
     # scale it up so flux is the same
     bgmed = np.median(bgimage_data)
-    shrunk_star_data = (shrunk_star_data-bgmed)/reduction/reduction + bgmed
+    shrunk_star_data = (shrunk_star_data - bgmed) / reduction / reduction + bgmed
     sh_ht, sh_wd = shrunk_star_data.shape
 
     # composite shrunk data centered on bg data
     bg_ht, bg_wd = bgimage_data.shape
-    lx = int((bg_wd-sh_wd)/2)
+    lx = int((bg_wd - sh_wd) / 2)
     hx = lx + sh_wd
-    ly = int((bg_ht-sh_ht)/2)
+    ly = int((bg_ht - sh_ht) / 2)
     hy = ly + sh_ht
     #print(bg_ht, bg_wd, sh_ht, sh_wd)
     #print(lx,hx,ly,hy)
@@ -80,6 +98,7 @@ class C8_F7_Star_Simulator:
     :param companion_offset: Optional offset (x, y) in pixels for another simulated star.
     :param companion_ratio: Ratio (0-1) of brightness of companion.
     """
+
     def __init__(self, starimage_name='../data/C8_Simul_Defocus_Star.fit',
                  bgimage_name='../data/C8_Simul_BG.fit',
                  companion_offset=None, companion_flux_ratio=1.0):
@@ -126,7 +145,7 @@ class C8_F7_Star_Simulator:
         if self.ref_hfd is None:
             # measure star size
             scen, sl, sr, hfl, hfr, totflux, alone = find_brightest_star_HFD(self.starimage_data)
-            self.ref_hfd = hfr-hfl
+            self.ref_hfd = hfr - hfl
             logging.info(f'Reference star HFD = {self.ref_hfd}')
 
 
@@ -153,7 +172,7 @@ class C8_F7_Star_Simulator:
         if focus_cen is None:
             focus_cen = self.get_best_focus_pos()
         hfd = self.simul_hfd_size(focus_pos, focus_cen)
-        red = min(1.0, hfd/self.ref_hfd)
+        red = min(1.0, hfd / self.ref_hfd)
         shrunk_image = shrink_star(self.starimage_data, self.bgimage_data, red)
 
         # make another star offset
@@ -165,7 +184,7 @@ class C8_F7_Star_Simulator:
             ox, oy = self.companion_offset[1], self.companion_offset[0]
             comp_image = ndimage.shift(shrunk_image, (ox, oy), mode='constant',
                                  cval=np.median(shrunk_image))
-            shrunk_image = (shrunk_image+self.companion_flux_ratio*comp_image)/(1+self.companion_flux_ratio)
+            shrunk_image = (shrunk_image+self.companion_flux_ratio*comp_image) / (1 + self.companion_flux_ratio)
 
         return shrunk_image
 
@@ -180,6 +199,7 @@ def parse_commandline():
     #    parser.add_argument('--debuggraphs', action='store_true', help="Display debug graphs")
 
     return parser.parse_args()
+
 
 if __name__ == '__main__':
     logging.basicConfig(filename='c8_simul_star.log',
@@ -213,13 +233,13 @@ if __name__ == '__main__':
 
     # measure star size
     scen, sl, sr, hfl, hfr = find_brightest_star_HFD(starimage_data, debugplots=True)
-    ref_hfd = hfr-hfl
+    ref_hfd = hfr - hfl
     logging.info(f'Reference star HFD = {ref_hfd}')
 
     shrunk_image = shrink_star(starimage_data, bgimage_data, 0.5)
 
     scen, sl, sr, hfl, hfr = find_brightest_star_HFD(shrunk_image, debugplots=True, debugfits=True)
-    shrunk_hfd = hfr-hfl
+    shrunk_hfd = hfr - hfl
     logging.info(f'50% shrunk star HFD = {shrunk_hfd}')
 
 #    focus_cen = 7983

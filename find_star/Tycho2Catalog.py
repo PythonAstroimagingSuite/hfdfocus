@@ -1,3 +1,23 @@
+#
+# Tycho2 catalog
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import logging
 import pickle
 
@@ -38,11 +58,11 @@ class SAOCatalog:
         self.maxmag = maxmag
         self.minmag = minmag
         self.mindec = mindec
-        for l in f.readlines():
+        for line in f.readlines():
             if first:
                 first = False
                 continue
-            fields = l.strip().split(',')
+            fields = line.strip().split(',')
 #            print(l.rstrip())
 #            print(fields)
 
@@ -63,7 +83,7 @@ class SAOCatalog:
                 if float(dec_deg) < mindec:
                     continue
             except Exception as err:
-                logging.error(f'Error processing #1 |{l.rstrip()}| |{vmag}| {err}')
+                logging.error(f'Error processing #1 |{line.rstrip()}| |{vmag}| {err}')
                 continue
 
             try:
@@ -72,7 +92,7 @@ class SAOCatalog:
                 self.dec.append(float(dec_deg))
                 self.vmag.append(float(vmag))
             except Exception as err:
-                logging.error(f'Error processing #2 |{l.rstrip()}| |{vmag}| {err}')
+                logging.error(f'Error processing #2 |{line.rstrip()}| |{vmag}| {err}')
                 continue
 
             nread += 1
@@ -102,7 +122,7 @@ class SAOCatalog:
         # try with haversine
         ddec = t_dec_rad - c_dec_rad
         dra = t_ra_rad - c_ra_rad
-        a = (np.sin(ddec/2)**2 + np.cos(t_dec_rad)*np.cos(c_dec_rad)*np.sin(dra/2)**2)
+        a = (np.sin(ddec / 2)**2 + np.cos(t_dec_rad) * np.cos(c_dec_rad) * np.sin(dra / 2)**2)
         c = 2 * np.arcsin(np.sqrt(a))
 
         #print(np.max(c), np.min(c), np.median(c))
@@ -127,4 +147,3 @@ class SAOCatalog:
         ret_idx = close_idx[mags_idx]
         #logging.debug(f'ret_idx = {ret_idx}')
         return ret_idx, c[ret_idx]
-

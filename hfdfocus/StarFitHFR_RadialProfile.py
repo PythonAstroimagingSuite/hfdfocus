@@ -1,10 +1,10 @@
 #
 # Determine HFR of stars using radial profie
 #
-# Copyright 2019 Michael Fulbright
+# Copyright 2020 Michael Fulbright
 #
 #
-#    This program is free software: you can redistribute it and/or modify
+#    hfdfocus is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
@@ -16,13 +16,11 @@
 #
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-import math
-import time
+#
+#
 import logging
-import argparse
 import numpy as np
-from scipy import signal, ndimage, interpolate
+from scipy import interpolate
 
 import astropy.io.fits as pyfits
 
@@ -41,19 +39,19 @@ def compute_radial_profile(data, ci, cj, bg):
 
     ni, nj = data.shape
 
-    rad = np.zeros(ni*nj+1)
-    val = np.zeros(ni*nj+1)
+    rad = np.zeros(ni * nj + 1)
+    val = np.zeros(ni * nj + 1)
     rad[0] = 0.0
     val[0] = 0.0
 
     # build array containing X indices and Y indices
     ij = np.mgrid[0:ni, 0:nj]
-    i=ij[0]
-    j=ij[1]
+    i = ij[0]
+    j = ij[1]
 
     di = i - ci
     dj = j - cj
-    rad  = np.sqrt(di*di + dj*dj).flatten()
+    rad = np.sqrt(di * di + dj * dj).flatten()
     val = (data - bg).flatten()
 
     # first sort by rad
@@ -80,10 +78,10 @@ def find_hfr_from_radial_profile(rad, val, window, extras=False):
             fluxtot += val[i]
             fluxrad[i] = fluxtot
         else:
-            fluxrad[i] = fluxrad[i-1]
+            fluxrad[i] = fluxrad[i - 1]
 
         if i > 0:
-            if fluxrad[i] < fluxrad[i-1]:
+            if fluxrad[i] < fluxrad[i - 1]:
                 nneg += 1
         # END OLD CODE
 
@@ -97,7 +95,7 @@ def find_hfr_from_radial_profile(rad, val, window, extras=False):
             if i == 0:
                 print(rad[i], val[i], fluxrad[i])
             else:
-                print(rad[i], val[i], fluxrad[i], (fluxrad[i]-fluxrad[i-1])/(fluxrad[i]))
+                print(rad[i], val[i], fluxrad[i], (fluxrad[i]-fluxrad[i - 1])/(fluxrad[i]))
 
 # END DEBUG
 
@@ -137,9 +135,9 @@ def find_hfr_from_radial_profile(rad, val, window, extras=False):
 
     rmin = 0.0
     rmax = np.amax(rad)
-    ftarg = fluxmax/2.0
+    ftarg = fluxmax / 2.0
     while True:
-        rmid = (rmin+rmax)/2.0
+        rmid = (rmin + rmax) / 2.0
         f = rfit(rmid)
         #print(ftarg, f, rmin, rmid, rmax)
         if f < ftarg:
@@ -154,7 +152,7 @@ def find_hfr_from_radial_profile(rad, val, window, extras=False):
 #            print(rmid, rmin, rmax, ftarg, f)
 # END DEBUG
 
-        if (rmax-rmin) < 0.001:
+        if (rmax - rmin) < 0.001:
             break
 
     # compute contrast (ratio of center value divided by hfr value
@@ -189,16 +187,16 @@ def find_star_HFR_Radial_Profle(star, image_data, thres=10000, win=100,
 
     boxsize = 15
 
-    xlow = max(0, int(xcen-boxsize))
-    xhi = min(img_wd-1, int(xcen+boxsize))
-    ylow = max(0, int(ycen-boxsize))
-    yhi = min(img_ht-1, int(ycen+boxsize))
+    xlow = max(0, int(xcen - boxsize))
+    xhi = min(img_wd - 1, int(xcen + boxsize))
+    ylow = max(0, int(ycen - boxsize))
+    yhi = min(img_ht - 1, int(ycen + boxsize))
     logging.debug(f'xlow:xhi={xlow}:{xhi}  ylow:yhi={ylow}:{yhi}')
     crop_data = image_data[ylow:yhi, xlow:xhi]
 
     if debugplots:
         plt.xticks(fontsize=7)
-        fig = plt.figure(figsize=(4,3), dpi=200)
+        fig = plt.figure(figsize=(4, 3), dpi=200)
         #fig.subplots_adjust(wspace=1.5)
         ax_2d = fig.add_subplot(131)
         ax_2d.tick_params(axis='both', which='major', labelsize=7)
@@ -209,7 +207,7 @@ def find_star_HFR_Radial_Profle(star, image_data, thres=10000, win=100,
         ax_1db = fig.add_subplot(133)
         ax_1db.tick_params(axis='both', which='major', labelsize=7)
         ax_1db.tick_params(axis='both', which='minor', labelsize=7)
-        im = ax_2d.imshow((crop_data-bg).astype(float))
+        im = ax_2d.imshow((crop_data - bg).astype(float))
         cb = fig.colorbar(im, ax=ax_2d)
         cb.ax.tick_params(labelsize=7)
 
@@ -227,7 +225,7 @@ def find_star_HFR_Radial_Profle(star, image_data, thres=10000, win=100,
         ax_1da.plot(r, v)
 
     # guess window from estsize
-    window = 2*estsize
+    window = 2 * estsize
 
     hfr = find_hfr_from_radial_profile(r, v, window, extras=True)
 
@@ -250,7 +248,8 @@ def find_star_HFR_Radial_Profle(star, image_data, thres=10000, win=100,
     else:
         return None
 
-def star_fit_hfr_radial_profile(image_data, max_stars=100, bgfact=50, satur=50000, window=7,
+def star_fit_hfr_radial_profile(image_data, max_stars=100,
+                                bgfact=50, satur=50000, window=7,
                                 debugplots=False, debugfits=False):
 
     detected = measure_stars_in_image(image_data, find_star_HFR_Radial_Profle,

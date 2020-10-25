@@ -1,9 +1,23 @@
 #
+# Autofocus on automatically selected star
 #
-# currently relies on being run from hfdfocus/scripts directory
-# and having pyastrometry_cli checked out in same tree
+# Copyright 2020 Michael Fulbright
 #
-
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import os
 import sys
 import json
@@ -47,26 +61,26 @@ def run_program(cmd_line, label='', trimlog=True):
     logging.debug(f'run_program() command value = |{cmd_val}|')
 
     with subprocess.Popen(cmd_val,
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                universal_newlines=True) as ps_proc:
+                          stdin=subprocess.PIPE,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT,
+                          universal_newlines=True) as ps_proc:
 
         if label == '':
             label = 'run_program()'
         logging.debug('ps_proc output:')
         output = ''
-        for l in ps_proc.stdout:
+        for line in ps_proc.stdout:
             #logging.debug(l.strip())
             if trimlog:
                 # get rid of first 3 'words' which are the
                 # logging info from program
-                words = l.strip().split(' ')
+                words = line.strip().split(' ')
                 out = ' '.join(words[3:])
             else:
-                out = l.strip()
+                out = line.strip()
             logging.info(f'{label}: {out}')
-            output += l
+            output += line
         logging.debug('end of output')
 
 #    poll_value = None
@@ -138,9 +152,10 @@ def run_platesolve():
         logging.debug(f"target_str = {target_str}")
 
         radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
-                          frame='fk5', equinox='J2000')
+                         frame='fk5', equinox='J2000')
 
     except Exception as err:
+        # FIXME Need more specific except
         logging.error(f"Error converting solve results! {err}")
         radec = None
 
@@ -149,6 +164,7 @@ def run_platesolve():
     try:
         os.unlink(result_fname)
     except:
+        # FIXME Need more specific except
         logging.error(f'Error cleaning up tmp file {result_fname}', exc_info=True)
 
     if radec is not None:
@@ -206,9 +222,10 @@ def run_getpos():
         logging.debug(f"target_str = {target_str}")
 
         radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
-                          frame='fk5', equinox='J2000')
+                         frame='fk5', equinox='J2000')
 
     except Exception as err:
+        # FIXME Need more specific except
         logging.error(f"Error converting solve results! {err}")
         radec = None
 
@@ -220,6 +237,7 @@ def run_getpos():
     try:
         os.unlink(result_fname)
     except:
+        # FIXME Need more specific except
         logging.error(f'Error cleaning up tmp file {result_fname}', exc_info=True)
 
     return radec
@@ -287,10 +305,10 @@ def run_findstars(curpos, args, lon=None):
     star_list = []
     try:
         nlines = 0
-        for l in result_file.readlines():
+        for line in result_file.readlines():
             #print(l.strip())
             if nlines == 0:
-                xxx, field = l.strip().split('=')
+                xxx, field = line.strip().split('=')
                 nstars = int(field)
                 logging.info(f'# candidate stars = {nstars}')
                 nlines += 1
@@ -300,7 +318,7 @@ def run_findstars(curpos, args, lon=None):
                 nlines += 1
                 continue
 
-            catidx, distdeg, sao, rastr, decstr, vmag, nneigh = l.strip().split(',')
+            catidx, distdeg, sao, rastr, decstr, vmag, nneigh = line.strip().split(',')
             target_str = rastr + " " + decstr
             logging.debug(f"star sao = {sao} target_str = {target_str}")
 
@@ -310,7 +328,7 @@ def run_findstars(curpos, args, lon=None):
                 continue
 
             radec = SkyCoord(target_str, unit=(u.hourangle, u.deg),
-                              frame='fk5', equinox='J2000')
+                             frame='fk5', equinox='J2000')
             star_list.append((sao, radec))
 
     except Exception as err:
@@ -324,6 +342,7 @@ def run_findstars(curpos, args, lon=None):
     try:
         os.unlink(result_fname)
     except:
+        # FIXME Need more specific except
         logging.error(f'Error cleaning up tmp file {result_fname}', exc_info=True)
 
     return star_list
@@ -403,7 +422,6 @@ def run_slew(target, args, extra_args):
     decstr = target.dec.to_string(alwayssign=True, sep=":", pad=True)
     cmd_line += f'" {decstr}" '
 
-
     # use json to handle double quotes in camera and mount
     # arguments which might be passed as something like "CCD Simulator"
     # and the shlex.split() will split them
@@ -479,6 +497,7 @@ def get_altaz_from_radec(radec, observer, obstime):
     logging.debug(f'get_mount_altaz: computerd alt = {altaz.alt.degree}')
     logging.debug(f'get_mount_altaz: computerd az  = {altaz.az.degree}')
     return altaz.alt.degree, altaz.az.degree
+
 
 if __name__ == '__main__':
 
@@ -639,7 +658,7 @@ if __name__ == '__main__':
             logging.info(f'Star alt/az is {star_alt:3.1f} {star_az:4.1f}')
             logging.info(f'args.nousehorizon = {args.nousehorizon}')
             if not args.nousehorizon:
-                logging.debug(f'Checking star against horizion definition')
+                logging.debug('Checking star against horizion definition')
                 hor_alt = astro_profile.observatory.horizon.get_alt(star_az)
                 logging.info(f'Horiizon alt at az={star_az:4.1f} is {hor_alt:3.1f} ')
                 if star_alt <= hor_alt:
@@ -647,7 +666,7 @@ if __name__ == '__main__':
                     continue
             logging.debug(f'args.nolower = {args.nolower}')
             if args.nolower is not None:
-                logging.info(f'Checking alt of star')
+                logging.info('Checking alt of star')
 
                 logging.info(f'nolowerthres = {args.nolowerthres}')
                 logging.info(f'MAX_NOLOWER_ALT = {MAX_NOLOWER_ALT}')
@@ -680,7 +699,7 @@ if __name__ == '__main__':
                 focus_result = run_autofocus(args, extra_args)
                 if args.errorsimul is not None:
                     import random
-                    if int(random.SystemRandom().random()*100) < args.errorsimul:
+                    if int(random.SystemRandom().random() * 100) < args.errorsimul:
                         logging.info('Simulating failure because of --simulerrors!')
                         focus_result = False
                 if not focus_result:
@@ -696,14 +715,14 @@ if __name__ == '__main__':
                 break
             stars_tried = stars_tried + 1
             if stars_tried < 4:
-                logging.error(f'Autofocus failed - trying next candidate!')
+                logging.error('Autofocus failed - trying next candidate!')
                 continue
             logging.error(f'Tried {stars_tried} stars unsuccessfully - quitting!')
             sys.exit(1)
         else:
             stars_tried = stars_tried + 1
             if stars_tried < 4:
-                logging.error(f'Precise slew failed - trying next candidate!')
+                logging.error('Precise slew failed - trying next candidate!')
                 continue
             logging.error(f'Tried {stars_tried} stars unsuccessfully - quitting!')
             sys.exit(1)
@@ -733,5 +752,3 @@ if __name__ == '__main__':
         sys.exit(1)
     else:
         sys.exit(0)
-
-

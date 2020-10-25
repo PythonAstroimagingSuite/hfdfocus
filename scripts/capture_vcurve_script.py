@@ -1,4 +1,23 @@
-# try to disable requests logging DEBUG
+#
+# Capture a Vcurve
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import requests
 import logging
 
@@ -118,11 +137,11 @@ if __name__ == '__main__':
 
     if args.debugplots:
         logging.info('Creating figure')
-        fig2 = plt.figure(figsize=(4,3))
+        fig2 = plt.figure(figsize=(4, 3))
         ax_hfd = fig2.add_subplot(111)
-        hfd_plot, = ax_hfd.plot([],[], marker='o', fillstyle='none', ls='')
+        hfd_plot, = ax_hfd.plot([], [], marker='o', fillstyle='none', ls='')
 
-        fig = plt.figure(figsize=(4,3))
+        fig = plt.figure(figsize=(4, 3))
         ax_2d = fig.add_subplot(121)
         ax_1d = fig.add_subplot(122)
 
@@ -136,7 +155,7 @@ if __name__ == '__main__':
             if iter != 0:
                 fig2.clear()
                 ax_hfd = fig2.add_subplot(111)
-                hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
+                hfd_plot, = ax_hfd.plot([], [], marker='o', ls='')
 
                 fig.clear()
                 ax_2d = fig.add_subplot(121)
@@ -145,7 +164,7 @@ if __name__ == '__main__':
         # figure out direction
         backlash = 250
         logging.info(f'Shifting focus center by runoffset = {args.runoffset}')
-        focus_low = int(focus_center+args.runoffset-focus_range/2)
+        focus_low = int(focus_center + args.runoffset-focus_range / 2)
         focus_high = focus_low + args.focus_range
         if args.focus_dir == 'OUT':
             # start past desired start and move to it to remove backlash
@@ -172,11 +191,11 @@ if __name__ == '__main__':
 
             sdi.wait_on_focuser_move(focuser)
 
-        focus_step = int((focus_end - focus_start)/(focus_nstep - 1))
+        focus_step = int((focus_end - focus_start) / (focus_nstep - 1))
         logging.info(f'Focus run from {focus_start} to {focus_end} step {focus_step}')
         fpos_arr = []
         hfd_arr = []
-        for focus_pos in range(focus_start, focus_end+focus_step, focus_step):
+        for focus_pos in range(focus_start, focus_end + focus_step, focus_step):
             logging.info(f'Moving to focus pos {focus_pos}')
             imgname = os.path.join(imagesdir, f'vcurve_focuspos_run{iter+1:03d}_{focus_pos}.fit')
             while True:
@@ -197,9 +216,9 @@ if __name__ == '__main__':
 
                     if args.framesize != 0:
                         w, h = cam.get_size()
-                        xl = int(w/2-args.framesize/2)
+                        xl = int(w / 2 - args.framesize / 2)
                         xw = args.framesize
-                        yt = int(h/2-args.framesize/2)
+                        yt = int(h / 2 - args.framesize / 2)
                         yh = args.framesize
                         roi = (xl, yt, xw, yh)
                     else:
@@ -236,8 +255,8 @@ if __name__ == '__main__':
                 #thres = 10000
 
                 xcen, ycen, bg, mad, starmask, alone = find_star(starimage_data,
-                                                          bgfact=args.bgthres,
-                                                          debugfits=True)
+                                                                 bgfact=args.bgthres,
+                                                                 debugfits=True)
 
                 #thres = bg + args.bgthres*mad
                 thres = 10000
@@ -248,10 +267,10 @@ if __name__ == '__main__':
                     logging.warning(f'SATURATED PIXELS DETECTED!')
 
                 win = 200
-                xlow = max(0, int(xcen-win/2))
-                xhi = min(starimage_data.shape[0]-1, int(xcen+win/2))
-                ylow = max(0, int(ycen-win/2))
-                yhi = min(starimage_data.shape[1]-1, int(ycen+win/2))
+                xlow = max(0, int(xcen - win / 2))
+                xhi = min(starimage_data.shape[0] - 1, int(xcen + win / 2))
+                ylow = max(0, int(ycen - win / 2))
+                yhi = min(starimage_data.shape[1] - 1, int(ycen + win / 2))
                 #logging.debug(f'cropping to window={win} x={xlow}:{xhi} y={ylow}:{yhi}')
                 crop_data = starimage_data[ylow:yhi, xlow:xhi]
 
@@ -259,7 +278,7 @@ if __name__ == '__main__':
                     fig.clear()
                     ax_2d = fig.add_subplot(121)
                     ax_1d = fig.add_subplot(122)
-                    im = ax_2d.imshow((crop_data-bg).astype(float))
+                    im = ax_2d.imshow((crop_data - bg).astype(float))
                     fig.colorbar(im, ax=ax_2d)
 
                 profile = horiz_bin_window(crop_data, bg=bg)
@@ -290,7 +309,7 @@ if __name__ == '__main__':
                     sys.exit(1)
 
             fpos_arr.append(focus_pos)
-            hfd_arr.append(hfr-hfl)
+            hfd_arr.append(hfr - hfl)
 
             if args.debugplots:
                 hfd_plot.set_data(fpos_arr, hfd_arr)
@@ -306,9 +325,9 @@ if __name__ == '__main__':
                     ax_1d.axvline(sr, color='green')
                     ax_1d.axvline(hfl, color='blue')
                     ax_1d.axvline(hfr, color='blue')
-                    delta = sr-sl
-                    ax_1d.set_xlim(sl-delta/4, sr+delta/4)
-                    ax_1d.set_title(f'{hfr-hfl:5.3f} {alone}')
+                    delta = sr - sl
+                    ax_1d.set_xlim(sl - delta / 4, sr + delta / 4)
+                    ax_1d.set_title(f'{hfr - hfl:5.3f} {alone}')
                 #print('drawing plot')
                 fig.show()
                 plt.pause(0.05)
@@ -330,10 +349,10 @@ if __name__ == '__main__':
         focus_center = fpos_arr[midx]
         logging.info(f'Set new focus center to {focus_center}')
 
-        fpos_arr_l = np.array(fpos_arr[:midx-2])
-        fpos_arr_r = np.array(fpos_arr[midx+3:])
-        hfd_arr_l = np.array(hfd_arr[:midx-2])
-        hfd_arr_r = np.array(hfd_arr[midx+3:])
+        fpos_arr_l = np.array(fpos_arr[:midx - 2])
+        fpos_arr_r = np.array(fpos_arr[midx + 3:])
+        hfd_arr_l = np.array(hfd_arr[:midx - 2])
+        hfd_arr_r = np.array(hfd_arr[midx + 3:])
 
         # apply threshold
         l_hfd_filter = np.where(hfd_arr_l > args.hfdcutoff)
@@ -350,9 +369,9 @@ if __name__ == '__main__':
 
         siegel_left_fit = siegelslopes(hfd_arr_l, fpos_arr_l)
         siegel_right_fit = siegelslopes(hfd_arr_r, fpos_arr_r)
-        siegel_left_zero = -siegel_left_fit[1]/siegel_left_fit[0]
-        siegel_right_zero = -siegel_right_fit[1]/siegel_right_fit[0]
-        siegel_best_pos = (siegel_left_fit[1]-siegel_right_fit[1])/(siegel_right_fit[0]-siegel_left_fit[0])
+        siegel_left_zero = -siegel_left_fit[1] / siegel_left_fit[0]
+        siegel_right_zero = -siegel_right_fit[1] / siegel_right_fit[0]
+        siegel_best_pos = (siegel_left_fit[1] - siegel_right_fit[1]) / (siegel_right_fit[0] - siegel_left_fit[0])
         logging.info(f'siegel left  fit = {siegel_left_fit}')
         logging.info(f'siegel right fit = {siegel_right_fit}')
         logging.info(f'siegel best pos  = {siegel_best_pos}')
@@ -360,8 +379,8 @@ if __name__ == '__main__':
         if args.debugplots:
             ax_hfd.plot(fpos_arr_l, hfd_arr_l, marker='+', ls='', color='red')
             ax_hfd.plot(fpos_arr_r, hfd_arr_r, marker='+', ls='', color='red')
-            ax_hfd.plot(fpos_arr[midx-5:], siegel_right_fit[0]*fpos_arr[midx-5:]+siegel_right_fit[1], color='green')
-            ax_hfd.plot(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1], color='blue')
+            ax_hfd.plot(fpos_arr[midx - 5:], siegel_right_fit[0] * fpos_arr[midx - 5:] + siegel_right_fit[1], color='green')
+            ax_hfd.plot(fpos_arr[:midx + 5], siegel_left_fit[0] * fpos_arr[:midx + 5] + siegel_left_fit[1], color='blue')
             ax_hfd.axvline(siegel_best_pos, color='red')
             ax_hfd.set_title(f'Left {siegel_left_fit[0]:7.6f}/{siegel_best_pos - siegel_left_zero:5.3f} Right {siegel_right_fit[0]:7.6f}/{siegel_best_pos - siegel_right_zero:5.3f}')
             ax_hfd.relim()
@@ -370,7 +389,8 @@ if __name__ == '__main__':
             fig2.canvas.draw()
             plt.pause(0.1)
 
-        fit_arr.append((siegel_left_fit[0], siegel_best_pos - siegel_left_zero, siegel_right_fit[0], siegel_best_pos - siegel_right_zero))
+        fit_arr.append((siegel_left_fit[0], siegel_best_pos - siegel_left_zero,
+                        siegel_right_fit[0], siegel_best_pos - siegel_right_zero))
 
         print(fpos_arr[:midx+5], siegel_left_fit[0]*fpos_arr[:midx+5]+siegel_left_fit[1])
 
@@ -398,7 +418,7 @@ if __name__ == '__main__':
 
     # write out
     f = open(os.path.join(imagesdir, f'hfd_run_{iter+1:03d}.txt'), 'w')
-    for (ls, lp, rs, rp)  in fit_arr:
+    for (ls, lp, rs, rp) in fit_arr:
         f.write(f'{ls}, {lp}, {rs}, {rp}\n')
     f.close()
 

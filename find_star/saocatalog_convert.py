@@ -1,9 +1,23 @@
 # find closest star within mag range
 # FIXME DOES NOT CONSIDER MERIDAN FLIP IMPLICATIONS!
-
-import os
-import sys
-import time
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import argparse
 import logging
 
@@ -16,11 +30,11 @@ def read_original_catalog(saocat, maxmag, minmag, mindec):
     saocat.maxmag = maxmag
     saocat.minmag = minmag
     saocat.mindec = mindec
-    for l in f.readlines():
+    for line in f.readlines():
         if first:
             first = False
             continue
-        fields = l.strip().split(',')
+        fields = line.strip().split(',')
 #            print(l.rstrip())
 #            print(fields)
 
@@ -41,7 +55,7 @@ def read_original_catalog(saocat, maxmag, minmag, mindec):
             if float(dec_deg) < mindec:
                 continue
         except Exception as err:
-            logging.error(f'Error processing #1 |{l.rstrip()}| |{vmag}| {err}')
+            logging.error(f'Error processing #1 |{line.rstrip()}| |{vmag}| {err}')
             continue
 
         try:
@@ -50,7 +64,7 @@ def read_original_catalog(saocat, maxmag, minmag, mindec):
             saocat.dec.append(float(dec_deg))
             saocat.vmag.append(float(vmag))
         except Exception as err:
-            logging.error(f'Error processing #2 |{l.rstrip()}| |{vmag}| {err}')
+            logging.error(f'Error processing #2 |{line.rstrip()}| |{vmag}| {err}')
             continue
 
         nread += 1
@@ -66,6 +80,7 @@ def read_original_catalog(saocat, maxmag, minmag, mindec):
     for id, radec, vmag in zip(saocat.id, saocat.radec, saocat.vmag):
         logging.info(f"{i:5d} {id:10s} {radec.to_string('hmsdms', sep=':'):30s}  {vmag:4.2f}")
         i += 1
+
 
 if __name__ == '__main__':
     logging.basicConfig(filename='saocatalog_convert.log',
@@ -96,6 +111,7 @@ if __name__ == '__main__':
 
     saocat = SAOCatalog()
 
-    read_original_catalog(saocat, maxmag=args.maxmag, minmag=args.minmag, mindec=args.mindec)
+    read_original_catalog(saocat, maxmag=args.maxmag,
+                          minmag=args.minmag, mindec=args.mindec)
 
     write_SAOCatalog_binary(saocat, args.outfile)

@@ -1,3 +1,28 @@
+#
+# SAOCatalog
+#
+# NOTE: Code is duplicated and refactored from StarFitHFD.py - decided it was
+#       better to star over and design it better and leave the existing
+#       single star code alone for now as it is used only by autofocus and
+#       is working really well!
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import logging
 from struct import pack, unpack, calcsize
 
@@ -109,6 +134,7 @@ class SAOCatalog:
     Class representing stars fromt the SAO Catalog.
 
     """
+
     def __init__(self):
         self.id = []
         self.epoch = 2000.0
@@ -147,7 +173,7 @@ class SAOCatalog:
         # try with haversine
         ddec = t_dec_rad - c_dec_rad
         dra = t_ra_rad - c_ra_rad
-        a = (np.sin(ddec/2)**2 + np.cos(t_dec_rad)*np.cos(c_dec_rad)*np.sin(dra/2)**2)
+        a = (np.sin(ddec / 2)**2 + np.cos(t_dec_rad) * np.cos(c_dec_rad)*np.sin(dra / 2)**2)
         c = 2 * np.arcsin(np.sqrt(a))
 
         #print(np.max(c), np.min(c), np.median(c))
@@ -172,4 +198,3 @@ class SAOCatalog:
         ret_idx = close_idx[mags_idx]
         #logging.debug(f'ret_idx = {ret_idx}')
         return ret_idx, c[ret_idx]
-

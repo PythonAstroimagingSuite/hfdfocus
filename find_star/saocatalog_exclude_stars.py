@@ -1,4 +1,24 @@
 #!/usr/bin/env python3
+# find closest star within mag range
+# FIXME DOES NOT CONSIDER MERIDAN FLIP IMPLICATIONS!
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import os
 import sys
 import time
@@ -36,7 +56,7 @@ if __name__ == '__main__':
 
     # see if exclusion list already exists so we don't overwrite
     if os.path.isfile('sao_exclude_lst.dat'):
-        logging.error(f'The file sao_exclude_lst.dat already exists!')
+        logging.error('The file sao_exclude_lst.dat already exists!')
         logging.error('Move it out of the way before running this command or')
         sys.exit(1)
 
@@ -49,17 +69,18 @@ if __name__ == '__main__':
     ts = time.time()
     ndone = 0
     for cat_idx in range(0, len(saocat.id)):
-        logging.debug(f'Evaluating cat index={cat_idx} ' \
+        logging.debug(f'Evaluating cat index={cat_idx} '
                       f'SAO={saocat.id[cat_idx]:>8d}')
         #logging.info("CatIdx    SAO           RA.DEC (J2000)           VMag")
 
         radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx],
                          unit=u.deg, frame='fk5', equinox='J2000')
-        logging.info(f"{cat_idx}   {saocat.id[cat_idx]:>8d} " \
-                     f"{radec.to_string('hmsdms', sep=':', precision=3):30s} " \
+        logging.info(f"{cat_idx}   {saocat.id[cat_idx]:>8d} "
+                     f"{radec.to_string('hmsdms', sep=':', precision=3):30s} "
                      f"{saocat.vmag[cat_idx]:4.2f}")
 
-        # look within 1 degree for other stars - set maxmag so all brighter star considered and minmag to 2 mags fainter
+        # look within 1 degree for other stars - set maxmag so all brighter
+        # stars considered and minmag to 2 mags fainter
         cand_idx_2, cand_dist_2 = saocat.find_stars_near_target(radec,
                                                                 near_search_rad,
                                                                 999, -999,
@@ -78,10 +99,9 @@ if __name__ == '__main__':
 
     te = time.time()
     logging.info(f'Excluded {len(exclude_list)} stars in {te-ts:6.2f} seconds')
-    f=open('sao_exclude_lst.dat', 'w')
+    f = open('sao_exclude_lst.dat', 'w')
     for exclude_idx in exclude_list:
         f.write(f'{exclude_idx}, {saocat.id[exclude_idx]}\n')
     f.close()
 
     sys.exit(0)
-

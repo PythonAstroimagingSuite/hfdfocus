@@ -1,3 +1,23 @@
+#
+# Autofocus on star
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import os
 import sys
 import math
@@ -71,10 +91,10 @@ def measure_frame(starimage_data):
         satur = True
 
     win = args.winsize
-    xlow = max(0, int(xcen-win/2))
-    xhi = min(starimage_data.shape[0]-1, int(xcen+win/2))
-    ylow = max(0, int(ycen-win/2))
-    yhi = min(starimage_data.shape[1]-1, int(ycen+win/2))
+    xlow = max(0, int(xcen - win / 2))
+    xhi = min(starimage_data.shape[0] - 1, int(xcen + win / 2))
+    ylow = max(0, int(ycen - win / 2))
+    yhi = min(starimage_data.shape[1] - 1, int(ycen + win / 2))
     logging.debug(f'cropping to window={win} x={xlow}:{xhi} y={ylow}:{yhi}')
     crop_data = starimage_data[ylow:yhi, xlow:xhi]
 
@@ -83,7 +103,7 @@ def measure_frame(starimage_data):
         #mpl.rcParams.update({'axes.labelsize' : 18})
         ax_1d = fig.add_subplot(121)
         ax_2d = fig.add_subplot(122)
-        im = ax_2d.imshow((crop_data-bg).astype(float))
+        im = ax_2d.imshow((crop_data - bg).astype(float))
         fig.colorbar(im, ax=ax_2d)
 
     profile = horiz_bin_window(crop_data, bg=bg)
@@ -106,12 +126,12 @@ def measure_frame(starimage_data):
                 ax_1d.axvline(sr, color='green')
                 ax_1d.axvline(hfl, color='blue')
                 ax_1d.axvline(hfr, color='blue')
-                delta = sr-sl
-                ax_1d.set_xlim(sl-delta/4, sr+delta/4)
+                delta = sr - sl
+                ax_1d.set_xlim(sl - delta / 4, sr + delta / 4)
 
         logging.info(f'measure_frame: HFD: {hfr-hfl:5.3f} SATUR: {satur} FLUX: {totflux:6.1f}')
 
-        return hfr-hfl, satur, rc
+        return hfr - hfl, satur, rc
     else:
         return None
 
@@ -119,9 +139,9 @@ def take_exposure_and_measure_star(imgname, focus_expos):
     if not args.simul:
         if args.framesize != 0:
             w, h = cam.get_size()
-            xl = int(w/2-args.framesize/2)
+            xl = int(w / 2 - args.framesize / 2)
             xw = args.framesize
-            yt = int(h/2-args.framesize/2)
+            yt = int(h / 2 - args.framesize / 2)
             yh = args.framesize
             roi = (xl, yt, xw, yh)
         else:
@@ -134,6 +154,7 @@ def take_exposure_and_measure_star(imgname, focus_expos):
         try:
             os.remove(imgname)
         except:
+            # FIXME Need more specific except
             pass
 
         rc = sdi.take_exposure(cam, focus_expos, imgname, roi=roi)
@@ -172,8 +193,8 @@ def measure_at_focus_pos(fpos, focus_expos, autoexpose=False, autoexpose_tries=4
         ntries = autoexpose_tries
     else:
         ntries = 1
-    for i in range(0, ntries):
 
+    for i in range(0, ntries):
         imgname = os.path.join(IMAGESDIR, f'vcurve_focuspos_{fpos}.fit')
         if not args.simul:
             rc = take_exposure_and_measure_star(imgname, use_expos)
@@ -192,7 +213,6 @@ def measure_at_focus_pos(fpos, focus_expos, autoexpose=False, autoexpose_tries=4
                 logging.info(f'Saturated star - dropping exposusure to {use_expos}')
             else:
                 break
-
 
     return rc
 
@@ -234,7 +254,7 @@ def average_measure_at_focus_pos(fpos, focus_expos, niter, tag=''):
             show_fig_and_wait(fig, args.debugplotsdelay)
 
     if ncap > 0:
-        return avg_hfd/ncap
+        return avg_hfd / ncap
     else:
         return None
 
@@ -246,9 +266,9 @@ def determine_final_hfd(fpos_best, best_expos):
     final_hfd = None
     logging.info('determine_final_hfd: starting exposure attempts')
     while True:
-        s_fact = (s_max + s_min)/2
+        s_fact = (s_max + s_min) / 2
         logging.info(f'scale min/max/cur: {s_min} {s_max} {s_fact}')
-        rc = measure_at_focus_pos(fpos_best, s_fact*best_expos, autoexpose=False)
+        rc = measure_at_focus_pos(fpos_best, s_fact * best_expos, autoexpose=False)
         logging.info(f'first = {first}')
         if rc is None:
             if first:
@@ -261,7 +281,7 @@ def determine_final_hfd(fpos_best, best_expos):
 #                logging.info('Exitting!')
 #                sys.exit(1)
 
-            logging.error(f'Measurement failed!')
+            logging.error('Measurement failed!')
             logging.warning(f'Setting s_min to {s_fact}')
             s_min = s_fact
         else:
@@ -315,12 +335,12 @@ def measure_file_only(image_file, debug_scale_factor=1.0):
     if rc is not None:
         hfd, satur, fresult = rc
         scen, sl, sr, hfl, hfr, totflux = fresult
-        logging.info(f'Measurement report:')
+        logging.info('Measurement report:')
         logging.info(f'Median: {m_med}')
         logging.info(f'Flux  : {totflux}')
         logging.info(f'HFD   : {hfd}')
     else:
-        logging.error(f'Measurement failed!')
+        logging.error('Measurement failed!')
         return False
     return True
 
@@ -338,13 +358,13 @@ def test_exposure_scaling(image_file):
     s_max = 16.0
     e_min = 0.1
     while True:
-        scale_factor = (s_min+s_max)/2
+        scale_factor = (s_min + s_max) / 2
 
-        s_starimage_data = (m_starimage_data-m_med)*scale_factor + m_med
+        s_starimage_data = (m_starimage_data - m_med) * scale_factor + m_med
 
         rc = measure_frame(s_starimage_data)
         logging.info(f'Measure frame for {args.measurefile} returned {rc}')
-        logging.info(f'Measurement report:')
+        logging.info('Measurement report:')
         logging.info(f'Scale Factor: {s_min} {s_max} {scale_factor}')
         logging.info(f'Median: {m_med}')
 
@@ -362,7 +382,7 @@ def test_exposure_scaling(image_file):
                 logging.warning(f'Saturated setting s_max to {scale_factor}')
                 s_max = scale_factor
         else:
-            logging.error(f'Measurement failed!')
+            logging.error('Measurement failed!')
             logging.warning(f'Setting s_min to {scale_factor}')
             s_min = scale_factor
 
@@ -472,7 +492,7 @@ if __name__ == '__main__':
 #        fig2 = plt.figure()
 #        ax_hfd = fig2.add_subplot(111)
 #        hfd_plot, = ax_hfd.plot([],[], marker='o', ls='')
-        fig = plt.figure(figsize=(4.5,2))
+        fig = plt.figure(figsize=(4.5, 2))
         ax_1d = fig.add_subplot(121)
         ax_2d = fig.add_subplot(122)
         plt.pause(0.01)
@@ -644,7 +664,7 @@ if __name__ == '__main__':
     # create output dir
     datestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())
 
-    IMAGESDIROBJ = tempfile.TemporaryDirectory(prefix='autofocus_hfd_script_'+datestr+'_')
+    IMAGESDIROBJ = tempfile.TemporaryDirectory(prefix='autofocus_hfd_script_' + datestr + '_')
     IMAGESDIR = IMAGESDIROBJ.name
 
     logging.info(f'Using temporary directory {IMAGESDIR}')
@@ -726,8 +746,8 @@ if __name__ == '__main__':
                 break
 
         # move out 10 HFD
-        nsteps = int(abs(10/vslope))
-        fpos_2 = fpos_1 - fdir*nsteps
+        nsteps = int(abs(10 / vslope))
+        fpos_2 = fpos_1 - fdir * nsteps
 
         rc_fpos2 = measure_at_focus_pos(fpos_2, focus_expos)
         if rc_fpos2 is None:
@@ -758,7 +778,7 @@ if __name__ == '__main__':
             logging.error('On wrong side of focus!')
 
             #  bump to near zero point
-            fpos_1 = fpos_2 - fdir*int(abs(hfd_2/vslope))
+            fpos_1 = fpos_2 - fdir * int(abs(hfd_2 / vslope))
             ntries += 1
             continue
 
@@ -774,12 +794,12 @@ if __name__ == '__main__':
 
     # compute location for desired Start HFD
     #initial_hfd = 24
-    fpos_start = fpos_2 - fdir*int(abs((start_hfd-hfd_2)/vslope))
+    fpos_start = fpos_2 - fdir * int(abs((start_hfd - hfd_2) / vslope))
     logging.info(f'Start HFD = {start_hfd} pred focus = {fpos_start}')
 
     # figure out direction
     #backlash = 200
-    fpos_pre_start = fpos_start - fdir*backlash
+    fpos_pre_start = fpos_start - fdir * backlash
 
     logging.info(f'Moving to pre-start pos {fpos_pre_start}')
     if not args.simul or args.forcehw:
@@ -802,7 +822,8 @@ if __name__ == '__main__':
 #        plt.pause(args.debugplotsdelay)
 
     # now take several measurements and get average HFD
-    avg_start_hfd = average_measure_at_focus_pos(fpos_start, focus_expos, args.numaverage, tag='start')
+    avg_start_hfd = average_measure_at_focus_pos(fpos_start, focus_expos,
+                                                 args.numaverage, tag='start')
 
     logging.info(f'START POSITION FOCUS AVERAGE HFD = {avg_start_hfd}')
 
@@ -811,7 +832,7 @@ if __name__ == '__main__':
     #inner_hfd = 12
 
     if avg_start_hfd is not None:
-        fpos_near = fpos_start + fdir*int(abs((near_hfd-avg_start_hfd)/vslope))
+        fpos_near = fpos_start + fdir * int(abs((near_hfd - avg_start_hfd) / vslope))
         logging.info(f'Near HFD = {near_hfd} pred focus = {fpos_near}')
     else:
         fpos_near = None
@@ -851,14 +872,15 @@ if __name__ == '__main__':
         show_fig_and_wait(fig, args.debugplotsdelay)
 
     # now take several measurements and get average HFD
-    avg_near_hfd = average_measure_at_focus_pos(fpos_near, focus_expos, args.numaverage, tag='near')
+    avg_near_hfd = average_measure_at_focus_pos(fpos_near, focus_expos,
+                                                args.numaverage, tag='near')
 
     logging.info(f'NEAR POSITION FOCUS AVERAGE HFD = {avg_near_hfd}')
 
     # now compute best focus
     if avg_near_hfd is not None:
         logging.info(f'Using final_offset = {final_offset}')
-        fpos_best = int(fpos_near + fdir*int(abs(avg_near_hfd/vslope)) + vpid + final_offset)
+        fpos_best = int(fpos_near + fdir * int(abs(avg_near_hfd / vslope)) + vpid + final_offset)
     else:
         fpos_best = None
 
@@ -919,4 +941,3 @@ if __name__ == '__main__':
     logging.info('Returning with rc of 0')
     #sys.exit(0)
     os._exit(0)
-

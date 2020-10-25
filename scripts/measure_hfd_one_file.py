@@ -1,3 +1,22 @@
+#
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import os
 import sys
 import time
@@ -44,7 +63,7 @@ if __name__ == '__main__':
     logging.info(f'args = {args}')
 
     if not args.noplot:
-        fig = plt.figure(figsize=(4,3))
+        fig = plt.figure(figsize=(4, 3))
         ax_2d = fig.add_subplot(121)
         ax_1d = fig.add_subplot(122)
 
@@ -61,29 +80,29 @@ if __name__ == '__main__':
     # use subframe
     if args.framesize != 0:
         h, w = starimage_data.shape
-        xl = int(w/2-args.framesize/2)
+        xl = int(w / 2 - args.framesize / 2)
         xw = args.framesize
-        yt = int(h/2-args.framesize/2)
+        yt = int(h / 2 - args.framesize / 2)
         yh = args.framesize
         logging.info(f'Shrinking to framesize = {args.framesize} ({xl}, {yt}) {xw} x {yh}')
-        starimage_data = starimage_data[yt:yt+yh, xl:xl+xw]
+        starimage_data = starimage_data[yt:yt + yh, xl:xl + xw]
 
 
     xcen, ycen, bg, mad, starmask = find_star(starimage_data, bgmodel=args.bgmodel,
                                     starmodel=args.starmodel, bgfact=args.bgthres,
                                     debugfits=True)
 
-    thres = bg + args.bgthres*mad
+    thres = bg + args.bgthres * mad
     logging.info(f'Using thres = {thres}')
 
     if np.max(starimage_data[starmask] > args.saturation):
-        logging.warning(f'SATURATED PIXELS DETECTED!')
+        logging.warning('SATURATED PIXELS DETECTED!')
 
     win = 300
-    xlow = max(0, int(xcen-win/2))
-    xhi = min(starimage_data.shape[0]-1, int(xcen+win/2))
-    ylow = max(0, int(ycen-win/2))
-    yhi = min(starimage_data.shape[1]-1, int(ycen+win/2))
+    xlow = max(0, int(xcen - win / 2))
+    xhi = min(starimage_data.shape[0] - 1, int(xcen + win / 2))
+    ylow = max(0, int(ycen - win / 2))
+    yhi = min(starimage_data.shape[1] - 1, int(ycen + win / 2))
     logging.debug(f'cropping to window={win} x={xlow}:{xhi} y={ylow}:{yhi}')
     crop_data = starimage_data[ylow:yhi, xlow:xhi]
 
@@ -91,7 +110,7 @@ if __name__ == '__main__':
         fig.clear()
         ax_2d = fig.add_subplot(121)
         ax_1d = fig.add_subplot(122)
-        im = ax_2d.imshow((crop_data-bg).astype(float))
+        im = ax_2d.imshow((crop_data - bg).astype(float))
         fig.colorbar(im, ax=ax_2d)
         #plt.show()
 
@@ -105,7 +124,7 @@ if __name__ == '__main__':
 #        logging.info(rc)
         pass
     else:
-        logging.warning(f'No star found in image')
+        logging.warning('No star found in image')
         plt.show()
         sys.exit(1)
 
@@ -118,9 +137,9 @@ if __name__ == '__main__':
             ax_1d.axvline(sr, color='green')
             ax_1d.axvline(hfl, color='blue')
             ax_1d.axvline(hfr, color='blue')
-            delta = sr-sl
-            ax_1d.set_xlim(sl-delta/4, sr+delta/4)
-            ax_1d.set_title(f'{hfr-hfl:5.3f}')
+            delta = sr - sl
+            ax_1d.set_xlim(sl - delta / 4, sr + delta / 4)
+            ax_1d.set_title(f'{hfr - hfl:5.3f}')
         print('drawing plot')
         fig.show()
         if args.pause is not None:

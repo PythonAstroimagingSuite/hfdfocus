@@ -1,3 +1,21 @@
+#
+# Copyright 2020 Michael Fulbright
+#
+#
+#    hfdfocus is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import os
 import re
 import glob
@@ -58,17 +76,17 @@ if __name__ == '__main__':
         xcen, ycen, bg, mad, starmask = find_star(image_data, debugfits=True)
 
         win = 100
-        xlow = int(xcen-win/2)
-        xhi = int(xcen+win/2)
-        ylow = int(ycen-win/2)
-        yhi = int(ycen+win/2)
+        xlow = int(xcen - win / 2)
+        xhi = int(xcen + win / 2)
+        ylow = int(ycen - win / 2)
+        yhi = int(ycen + win / 2)
         crop_data = image_data[ylow:yhi, xlow:xhi]
 
         if args.debugplots:
             fig = plt.figure()
             ax_2d = fig.add_subplot(121)
             ax_1d = fig.add_subplot(122)
-            im = ax_2d.imshow((crop_data-bg).astype(float))
+            im = ax_2d.imshow((crop_data - bg).astype(float))
             fig.colorbar(im, ax=ax_2d)
 
         profile = horiz_bin_window(crop_data, bg=bg)
@@ -88,10 +106,10 @@ if __name__ == '__main__':
                 ax_1d.axvline(sr, color='green')
                 ax_1d.axvline(hfl, color='blue')
                 ax_1d.axvline(hfr, color='blue')
-                delta = sr-sl
-                ax_1d.set_xlim(sl-delta/4, sr+delta/4)
+                delta = sr - sl
+                ax_1d.set_xlim(sl - delta / 4, sr + delta / 4)
 
-        print('total counts = ', np.sum(crop_data-bg))
+        print('total counts = ', np.sum(crop_data - bg))
 
         if args.debugplots:
             plt.show()
