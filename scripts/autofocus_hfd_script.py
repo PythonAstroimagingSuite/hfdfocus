@@ -476,7 +476,7 @@ if __name__ == '__main__':
     log = logging.getLogger()
     formatter = logging.Formatter(CONSOLE_FORMAT)
     ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
+    ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
@@ -720,6 +720,17 @@ if __name__ == '__main__':
     while ntries < 3:
 
         while True:
+            logging.info(f'Moving to focus pos 1 {fpos_1}')
+            
+            # use overshoot method
+            fpos_pre_start = fpos_1 - fdir * backlash
+            
+            logging.info(f'Moving to pre-start pos {fpos_pre_start}')
+            if not args.simul or args.forcehw:
+                move_focuser(fpos_pre_start)
+                time.sleep(0.5)            
+            # end overshoot
+            
             rc_fpos1 = measure_at_focus_pos(fpos_1, focus_expos)
             if rc_fpos1 is None:
                 hfd_1 = None
@@ -748,6 +759,17 @@ if __name__ == '__main__':
         # move out 10 HFD
         nsteps = int(abs(10 / vslope))
         fpos_2 = fpos_1 - fdir * nsteps
+        
+        logging.info(f'Moving to focus pos 2 {fpos_2}')
+
+        # use overshoot method
+        fpos_pre_start = fpos_2 - fdir * backlash
+        
+        logging.info(f'Moving to pre-start pos {fpos_pre_start}')
+        if not args.simul or args.forcehw:
+            move_focuser(fpos_pre_start)
+            time.sleep(0.5)            
+        # end overshoot
 
         rc_fpos2 = measure_at_focus_pos(fpos_2, focus_expos)
         if rc_fpos2 is None:
@@ -794,7 +816,8 @@ if __name__ == '__main__':
 
     # compute location for desired Start HFD
     #initial_hfd = 24
-    fpos_start = fpos_2 - fdir * int(abs((start_hfd - hfd_2) / vslope))
+    logging.debug(f'{fpos_1} {fpos_2} {fdir} {start_hfd} {hfd_2} {vslope}')
+    fpos_start = fpos_2 + fdir * int(abs((start_hfd - hfd_2) / vslope))
     logging.info(f'Start HFD = {start_hfd} pred focus = {fpos_start}')
 
     # figure out direction
