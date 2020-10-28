@@ -18,15 +18,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-import requests
 import logging
-
-
-# for key in logging.Logger.manager.loggerDict:
-#     #print(key)
-#     logging.getLogger(key).setLevel(logging.CRITICAL)
-
-
 import os
 import sys
 import time
@@ -249,7 +241,7 @@ if __name__ == '__main__':
                 hdu = pyfits.open(imgname)
                 starimage_data = hdu[0].data.astype(float)
                 hdu.close()
-                
+
                 if not args.savefits:
                     os.unlink(imgname)
 
@@ -330,15 +322,15 @@ if __name__ == '__main__':
             if star_found:
                 fpos_arr.append(focus_pos)
                 hfd_arr.append(hfr - hfl)
-    
+
                 if args.debugplots:
                     hfd_plot.set_data(fpos_arr, hfd_arr)
                     ax_hfd.relim()
                     ax_hfd.autoscale_view()
                     ax_hfd.set_title(f'iter {iter+1} of {args.nruns} pt {len(hfd_arr)+1} of {args.focus_nstep}')
-    
+
                     fig2.canvas.draw()
-    
+
                     ax_1d.axvline(scen, color='red')
                     if sl is not None and sr is not None:
                         ax_1d.axvline(sl, color='green')
@@ -357,7 +349,7 @@ if __name__ == '__main__':
         if len(fpos_arr) == 0:
             logging.error('No data points so V Curve cannot be fit!')
             sys.exit(1)
-            
+
         fpos_arr = np.array(fpos_arr)
         hfd_arr = np.array(hfd_arr)
 

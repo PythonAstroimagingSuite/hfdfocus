@@ -721,16 +721,16 @@ if __name__ == '__main__':
 
         while True:
             logging.info(f'Moving to focus pos 1 {fpos_1}')
-            
+
             # use overshoot method
             fpos_pre_start = fpos_1 - fdir * backlash
-            
+
             logging.info(f'Moving to pre-start pos {fpos_pre_start}')
             if not args.simul or args.forcehw:
                 move_focuser(fpos_pre_start)
-                time.sleep(0.5)            
+                time.sleep(0.5)
             # end overshoot
-            
+
             rc_fpos1 = measure_at_focus_pos(fpos_1, focus_expos)
             if rc_fpos1 is None:
                 hfd_1 = None
@@ -759,16 +759,16 @@ if __name__ == '__main__':
         # move out 10 HFD
         nsteps = int(abs(10 / vslope))
         fpos_2 = fpos_1 - fdir * nsteps
-        
+
         logging.info(f'Moving to focus pos 2 {fpos_2}')
 
         # use overshoot method
         fpos_pre_start = fpos_2 - fdir * backlash
-        
+
         logging.info(f'Moving to pre-start pos {fpos_pre_start}')
         if not args.simul or args.forcehw:
             move_focuser(fpos_pre_start)
-            time.sleep(0.5)            
+            time.sleep(0.5)
         # end overshoot
 
         rc_fpos2 = measure_at_focus_pos(fpos_2, focus_expos)
