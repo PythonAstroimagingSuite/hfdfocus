@@ -20,9 +20,9 @@ V Curves.  The program will run a specified number of V Curve captures.
 
 .. code-block:: bash
 
-    usage: capture_vcurve_script.py [-h] [--debugplots] [--simul]
-                                    [--focuser_driver FOCUSER_DRIVER]
-                                    [--camera_driver CAMERA_DRIVER]
+    usage: capture_vcurve_script.py [-h] [--debugplots] [--savefits] [--simul]
+                                    [--profile PROFILE] [--backend BACKEND]
+                                    [--focuser FOCUSER] [--camera CAMERA]
                                     [--exposure_start EXPOSURE_START]
                                     [--exposure_min EXPOSURE_MIN]
                                     [--exposure_max EXPOSURE_MAX]
@@ -31,6 +31,7 @@ V Curves.  The program will run a specified number of V Curve captures.
                                     [--framesize FRAMESIZE]
                                     [--runoffset RUNOFFSET]
                                     [--hfdcutoff HFDCUTOFF] [--bgthres BGTHRES]
+                                    [--movedelay MOVEDELAY] [--backlash BACKLASH]
                                     focus_center focus_range focus_nstep focus_dir
                                     nruns
 
@@ -44,11 +45,12 @@ V Curves.  The program will run a specified number of V Curve captures.
     optional arguments:
       -h, --help            show this help message and exit
       --debugplots          show debug plots
+      --savefits            Save all images taken
       --simul               Simulate star
-      --focuser_driver FOCUSER_DRIVER
-                            Focuser Driver
-      --camera_driver CAMERA_DRIVER
-                            Camera Driver
+      --profile PROFILE     Name of astro profile
+      --backend BACKEND     Backend
+      --focuser FOCUSER     Focuser Driver
+      --camera CAMERA       Camera Driver
       --exposure_start EXPOSURE_START
                             Starting exposure value
       --exposure_min EXPOSURE_MIN
@@ -66,6 +68,10 @@ V Curves.  The program will run a specified number of V Curve captures.
       --hfdcutoff HFDCUTOFF
                             Ignore points with HFD less than this value
       --bgthres BGTHRES     Threshold multiplier for star detection
+      --movedelay MOVEDELAY
+                            Delay in seconds between moves
+      --backlash BACKLASH   Number of steps of backlash for overshoot method
+
 
 When run it will create a directory with a named based on the current data and time
 and fill it with the images captured at each focus position.  It will also create

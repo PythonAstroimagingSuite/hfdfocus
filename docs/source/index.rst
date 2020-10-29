@@ -14,7 +14,7 @@ Welcome to hfdfocus's documentation!
    autofocus_auto_star
    find_nearby_stars
    working_with_vcurves
-
+   modules
 
 
 Indices and tables
