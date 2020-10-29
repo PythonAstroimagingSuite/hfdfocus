@@ -1,5 +1,5 @@
-PythonAstroimagingSuite
-=======================
+Python Astroimaging Suite
+=========================
 
 Check out the PythonAstroimagingSuite at https://github.com/PythonAstroimagingSuite/.
 
@@ -16,4 +16,4 @@ The driver requires python => 3.7.
 Source
 ------
 
-Source is available on github at https://github.com/PythonAstroimagingSuite/pyastrometry.git.
+Source is available on github at https://github.com/PythonAstroimagingSuite/hfdfocus.git.
