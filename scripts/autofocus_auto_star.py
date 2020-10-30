@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 # Autofocus on automatically selected star
 #
@@ -35,18 +36,9 @@ from astropy.time import Time
 
 from pyastroprofile.AstroProfile import AstroProfile
 
-# FIXME this should be handled automaticall!
-
-#if os.name == 'nt':
-#    PYTHON_EXE_PATH = 'C:\\Users\\msf\\Anaconda3\\envs\\AstronomyUtilitiesPipNumpy\\python'
-#elif os.name == 'posix':
-#    PYTHON_EXE_PATH = '/home/msf/anaconda3/envs/pyastro37/bin/python3 '
-#else:
-#    logging.error('PYTHON_EXE_PATH NOT SET')
-#    sys.exit(1)
-
 # find interpretter we're running under and use it?
-PYTHON_EXE_PATH = sys.executable
+#PYTHON_EXE_PATH = sys.executable
+PYTHON_EXE_PATH = None
 
 def run_program(cmd_line, label='', trimlog=True):
     """ runs exec_path with cmd_line returning the return code rc and stdout
@@ -57,6 +49,9 @@ def run_program(cmd_line, label='', trimlog=True):
         cmd_val = cmd_line
     elif os.name == 'posix':
         cmd_val = shlex.split(cmd_line)
+
+    logging.debug(f'run_program() command line = |{cmd_line}|')
+
 
     logging.debug(f'run_program() command value = |{cmd_val}|')
 
@@ -116,7 +111,10 @@ def run_platesolve():
     result_fname = tmp_result_fname
     logging.debug(f'Using solution json tmp file {result_fname}')
 
-    cmd_line = PYTHON_EXE_PATH + ' '
+    cmd_line = ''
+    if PYTHON_EXE_PATH is not None:
+        cmd_line += PYTHON_EXE_PATH + ' '
+
     script = 'pyastrometry_cli_main.py'
     if PYASTROMETRY_SCRIPT_PATH is not None:
         script = os.path.join(PYASTROMETRY_SCRIPT_PATH, script)
@@ -190,7 +188,10 @@ def run_getpos():
     result_fname = tmp_result_fname
     logging.debug(f'Using solution json tmp file {result_fname}')
 
-    cmd_line = PYTHON_EXE_PATH + ' '
+    cmd_line = ''
+    if PYTHON_EXE_PATH is not None:
+        cmd_line += PYTHON_EXE_PATH + ' '
+
     script = 'pyastrometry_cli_main.py'
     if PYASTROMETRY_SCRIPT_PATH is not None:
         script = os.path.join(PYASTROMETRY_SCRIPT_PATH, script)
@@ -254,16 +255,21 @@ def run_findstars(curpos, args, lon=None):
     logging.debug(f'Using solution json tmp file {result_fname}')
 
     import time
-    time.sleep(10)
 
-    cmd_line = PYTHON_EXE_PATH + ' '
+    # FIXME Why is this here???
+    # time.sleep(10)
+
+    cmd_line = ''
+    if PYTHON_EXE_PATH is not None:
+        cmd_line = PYTHON_EXE_PATH + ' '
+
     if AUTOFOCUS_SCRIPT_PATH is not None:
         cmd_line += f'{AUTOFOCUS_SCRIPT_PATH}/'
     cmd_line += 'find_nearby_stars.py '
     if AUTOFOCUS_DATA_PATH is not None:
         cmd_line += f'{AUTOFOCUS_DATA_PATH}/'
     #cmd_line += '../data/SAO_Catalog_m5_p11_filtered.bin '
-    cmd_line += 'SAO_Catalog_m5_p11_filtered.bin '
+    #cmd_line += 'SAO_Catalog_m5_p11_filtered.bin '
     rastr = curpos.ra.to_string(u.hour, sep=":", pad=True)
     cmd_line += rastr + ' '
     decstr = curpos.dec.to_string(alwayssign=True, sep=":", pad=True)
@@ -364,7 +370,10 @@ def run_precise_slew(target, args, extra_args):
 
     logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
 
-    cmd_line = PYTHON_EXE_PATH + ' '
+    cmd_line = ''
+    if PYTHON_EXE_PATH is not None:
+        cmd_line = PYTHON_EXE_PATH + ' '
+
     script = 'pyastrometry_cli_main.py'
     if PYASTROMETRY_SCRIPT_PATH is not None:
         script = os.path.join(PYASTROMETRY_SCRIPT_PATH, script)
@@ -412,7 +421,10 @@ def run_slew(target, args, extra_args):
 
     logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
 
-    cmd_line = PYTHON_EXE_PATH + ' '
+    cmd_line = ''
+    if PYTHON_EXE_PATH is not None:
+        cmd_line = PYTHON_EXE_PATH + ' '
+
     script = 'pyastrometry_cli_main.py'
     if PYASTROMETRY_SCRIPT_PATH is not None:
         script = os.path.join(PYASTROMETRY_SCRIPT_PATH, script)
@@ -453,7 +465,10 @@ def run_autofocus(args, extra_args):
     dev_args, unknown = parser.parse_known_args(sys.argv)
     logging.debug(f'dev_args, unknown = {dev_args} {unknown}')
 
-    cmd_line = PYTHON_EXE_PATH + ' '
+    cmd_line = ''
+    if PYTHON_EXE_PATH is not None:
+        cmd_line = PYTHON_EXE_PATH + ' '
+
     if AUTOFOCUS_SCRIPT_PATH is not None:
         cmd_line += f'{AUTOFOCUS_SCRIPT_PATH}/'
     cmd_line += 'autofocus_hfd_script.py '
@@ -494,8 +509,8 @@ def run_autofocus(args, extra_args):
 
 def get_altaz_from_radec(radec, observer, obstime):
     altaz = observer.altaz(obstime, target=radec)
-    logging.debug(f'get_mount_altaz: computerd alt = {altaz.alt.degree}')
-    logging.debug(f'get_mount_altaz: computerd az  = {altaz.az.degree}')
+    logging.debug(f'get_mount_altaz: computed alt = {altaz.alt.degree}')
+    logging.debug(f'get_mount_altaz: computed az  = {altaz.az.degree}')
     return altaz.alt.degree, altaz.az.degree
 
 
@@ -517,14 +532,6 @@ if __name__ == '__main__':
                         format=LONG_FORMAT,
                         datefmt='%Y-%m-%d %H:%M:%S')
 
-    # add to screen as well
-    log = logging.getLogger()
-    formatter = logging.Formatter(SHORT_FORMAT)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    log.addHandler(ch)
-
     start_time = time.time()
 
     parser = argparse.ArgumentParser()
@@ -538,29 +545,46 @@ if __name__ == '__main__':
     parser.add_argument('--profile', type=str, help='Name of astro profile')
     parser.add_argument('--usedebugpaths', action='store_true', help='Run auxilary programs from checked out sources')
     parser.add_argument('--maxtries', type=int, default=3, help='Number of tries before giving up')
+    # args, extra_args = parser.parse_known_args()
+
+    # # if not using focusonly then add in the rest of the args and reparse
+    # if not args.focusonly:
+    parser.add_argument('--dist', type=float, help='Max distance in degrees')
+    parser.add_argument('--mag', type=float, help='Desired mag focus star')
+    parser.add_argument('--lst', type=str, help='Local sidereal time')
+    parser.add_argument('--onlyside', type=str, help='EAST or WEST side only')
+    parser.add_argument('--currentside', action='store_true',
+                        help='Current pier side side only')
+    parser.add_argument('--lon', type=float, help='Location longitude')
+    parser.add_argument('--meridianthres', type=str, default='00:30:00',
+                        help='How close to meridian is allowed (hh:mm:ss)')
+    #parser.add_argument('--noplatesolve', action='store_true', help='Just slew do not improve accuracy with plate solving')
+    parser.add_argument('--preciseslewstar', action='store_true', help='Use precise slew to star')
+    parser.add_argument('--preciseslewreturn', action='store_true', help='Use precise slew returning from star')
+    parser.add_argument('--nolower', type=float, default=None, help='How many degrees lower star can be')
+    parser.add_argument('--nolowerthres', type=float, default=None, help='Minimum altitude to enforce --nolower')
+    parser.add_argument('--nousehorizon', action='store_true', help='Ignore horizon in astroprofile when choosing stars')
+    parser.add_argument('--errorsimul', type=int, help='Randomly have autofocus fail for testing - give percentage fail rate')
+    parser.add_argument('--debug', action='store_true')
+
     args, extra_args = parser.parse_known_args()
-
-    # if not using focusonly then add in the rest of the args and reparse
-    if not args.focusonly:
-        parser.add_argument('--dist', type=float, help='Max distance in degrees')
-        parser.add_argument('--mag', type=float, help='Desired mag focus star')
-        parser.add_argument('--lst', type=str, help='Local sidereal time')
-        parser.add_argument('--onlyside', type=str, help='EAST or WEST side only')
-        parser.add_argument('--lon', type=float, help='Location longitude')
-        parser.add_argument('--meridianthres', type=str, default='00:30:00',
-                            help='How close to meridian is allowed (hh:mm:ss)')
-        #parser.add_argument('--noplatesolve', action='store_true', help='Just slew do not improve accuracy with plate solving')
-        parser.add_argument('--preciseslewstar', action='store_true', help='Use precise slew to star')
-        parser.add_argument('--preciseslewreturn', action='store_true', help='Use precise slew returning from star')
-        parser.add_argument('--nolower', type=float, default=None, help='How many degrees lower star can be')
-        parser.add_argument('--nolowerthres', type=float, default=None, help='Minimum altitude to enforce --nolower')
-        parser.add_argument('--nousehorizon', action='store_true', help='Ignore horizon in astroprofile when choosing stars')
-        parser.add_argument('--errorsimul', type=int, help='Randomly have autofocus fail for testing - give percentage fail rate')
-
-        args, extra_args = parser.parse_known_args()
 
     logging.debug(f'args = {args}')
     logging.debug(f'extra_args = {extra_args}')
+
+    print(args, extra_args)
+
+    # add to screen as well
+    log = logging.getLogger()
+    formatter = logging.Formatter(LONG_FORMAT)
+    ch = logging.StreamHandler()
+    if args.debug:
+        loglevel = logging.DEBUG
+    else:
+        loglevel = logging.INFO
+    ch.setLevel(loglevel)
+    ch.setFormatter(formatter)
+    log.addHandler(ch)
 
     # FIXME setup DEBUG paths if we're running all from git
     if args.usedebugpaths:

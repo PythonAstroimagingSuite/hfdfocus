@@ -1,0 +1,5 @@
+include *.md
+include LICENSE.txt
+recursive-include docs/build/html *
+include hfdfocus/data/SAO_Catalog_m5_p11_filtered.bin
+

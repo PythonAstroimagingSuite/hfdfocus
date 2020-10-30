@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 # find closest star within mag range
 #
@@ -23,6 +24,7 @@ import sys
 import numpy as np
 import argparse
 import logging
+from pathlib import Path
 
 print("find_nearby_stars.py: DISABLED IERS AGE CHECK!")
 from astropy.utils.iers import conf
@@ -35,12 +37,16 @@ from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
 
+import hfdfocus
 from hfdfocus.SAOCatalog import load_SAOCatalog_binary
 
-if __name__ == '__main__':
-    LONG_FORMAT = '%(asctime)s.%(msecs)03d [%(filename)20s:%(lineno)3s - %(funcName)20s() ] %(levelname)-8s %(message)s'
-    SHORT_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
+# default catalog
+CATALOG_NAME = "data/SAO_Catalog_m5_p11_filtered.bin"
 
+if __name__ == '__main__':
+    LONG_FORMAT = '%(asctime)s.%(msecs)03d [%(filename)20s:%(lineno)3s - ' \
+                  + '%(funcName)20s() ] %(levelname)-8s %(message)s'
+    SHORT_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
 
     logging.basicConfig(filename='find_star.log',
                         filemode='w',
@@ -48,26 +54,21 @@ if __name__ == '__main__':
                         format=LONG_FORMAT, #format='%(asctime)s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
-    # add to screen as well
-    log = logging.getLogger()
-    formatter = logging.Formatter(SHORT_FORMAT)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    log.addHandler(ch)
-
     parser = argparse.ArgumentParser()
-    parser.add_argument('cat', type=str, help='Catalog to search')
-    parser.add_argument('ra2000', type=str, help='RA J2000')
-    parser.add_argument('dec2000', type=str, help='DEC J2000')
+    parser.add_argument('ra2000', type=str, help='RA J2000 HH:MM:SS')
+    parser.add_argument('dec2000', type=str, help='DEC J2000 DD:MM:SS')
     parser.add_argument('dist', type=float, help='Max distance in degrees')
-    parser.add_argument('--minmag', type=float, default=8)
-    parser.add_argument('--maxmag', type=float, default=7)
+    parser.add_argument('--cat', type=str, help='Override catalog to search')
+    parser.add_argument('--minmag', type=float, default=8, help='Faintest mag allowed')
+    parser.add_argument('--maxmag', type=float, default=7, help='Brightest mag allowed')
     parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--debug', action='store_true')
     parser.add_argument('--outfile', type=str, help='Output file with candidates')
     parser.add_argument('--force', action='store_true', help='Overwrite output file')
     parser.add_argument('--lst', type=str, help='Local sidereal time')
     parser.add_argument('--onlyside', type=str, help='EAST or WEST side only')
+    parser.add_argument('--currentside', action='store_true',
+                        help='Only look on current side of pier')
     parser.add_argument('--meridianthres', type=str, default='00:30:00',
                         help='How close to meridian is allowed (hh:mm:ss)')
     parser.add_argument('--lon', type=float, help='Location longitude')
@@ -78,6 +79,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logging.debug(f'args = {args}')
+
+    # add to screen as well
+    log = logging.getLogger()
+    formatter = logging.Formatter(LONG_FORMAT)
+    ch = logging.StreamHandler()
+    if args.debug:
+        loglevel = logging.DEBUG
+    else:
+        loglevel = logging.INFO
+    ch.setLevel(loglevel)
+    ch.setFormatter(formatter)
+    log.addHandler(ch)
 
     # complain if output file exists
     if args.outfile is not None:
@@ -90,6 +103,19 @@ if __name__ == '__main__':
                 logging.debug(f'Removing existing output file {args.outfile}')
                 os.unlink(args.outfile)
 
+    # first convert input ra/dec to angles
+    target_str = args.ra2000 + " "
+    target_str += args.dec2000
+    logging.debug(f"target_str = {target_str}")
+
+    try:
+        target = SkyCoord(target_str, unit=(u.hourangle, u.deg),
+                          frame='fk5', equinox='J2000')
+    except ValueError:
+        logging.error("Invalid RA/DEC POSITION!")
+        sys.exit(1)
+
+
     # arguments for controlling filtering by which side of meridian are a
     # bit convoluted and conflict
     #
@@ -101,6 +127,7 @@ if __name__ == '__main__':
     #
     # --lon --onlyside
     #
+    meridian_thres = None
     local_sidtime = None
     force_side = None
     if args.lst:
@@ -145,30 +172,50 @@ if __name__ == '__main__':
             sys.exit(1)
 
         # figure out side requested position is on
-        if args.onlyside not in ['EAST', 'WEST']:
-            logging.error('--onlyside must specify EAST or WEST only')
+        logging.debug(f'{args.onlyside} {args.currentside}')
+        if args.onlyside is not None and args.currentside:
+            logging.error('Can only specify one of --onlyside and '
+                          '--currentside!')
             sys.exit(1)
-        force_side = args.onlyside
+        if args.onlyside is not None:
+            if args.onlyside not in ['EAST', 'WEST']:
+                logging.error('--onlyside must specify EAST or WEST only')
+                sys.exit(1)
+            force_side = args.onlyside
+        elif args.currentside is not None:
+            # compute current side using HA
+            hour_angle = (local_sidtime - target.ra)
+            logging.debug(f'target hour angle={hour_angle}')
+            if abs(hour_angle.hour) > 6:
+                logging.error('Target is too far from meridian! '
+                              f'Hour angle = {hour_angle}.')
+                sys.exit(1)
+            elif hour_angle < 0:
+                logging.debug('Target is in EAST')
+                force_side = 'EAST'
+            else:
+                logging.debug('Target is in the WEST')
+                force_side = 'WEST'
 
-    logging.debug(f'Using pier side constraint of {force_side} '
-                  f'and LST = {local_sidtime.hms}')
-    logging.debug(f'Using meridian threshold of {meridian_thres.to_string(unit=u.hour)}')
+    logging.debug(f'Using pier side constraint of {force_side} ')
+    if local_sidtime is not None:
+        logging.debug(f'Using LST = {local_sidtime.hms}')
 
-    saocat = load_SAOCatalog_binary(args.cat)
+    if meridian_thres is not None:
+        logging.debug(f'Using meridian threshold of '
+                      '{meridian_thres.to_string(unit=u.hour)}')
+
+    # see if the catalog was overridden
+    if args.cat is not None:
+        catalog_path = args.cat
+    else:
+        # sniff location from package location
+        catalog_path = Path(hfdfocus.__file__).parent.joinpath(CATALOG_NAME)
+
+    saocat = load_SAOCatalog_binary(catalog_path)
     logging.debug(f'Loaded {len(saocat.id)} stars')
 
     # 'fast' compute distance between points
-    # first convert input ra/dec to angles
-    target_str = args.ra2000 + " "
-    target_str += args.dec2000
-    logging.debug(f"target_str = {target_str}")
-
-    try:
-        target = SkyCoord(target_str, unit=(u.hourangle, u.deg),
-                          frame='fk5', equinox='J2000')
-    except ValueError:
-        logging.error("Invalid RA/DEC POSITION!")
-        sys.exit(1)
 
     # SAO Catalog I have is in J2000 so we can compare directly
     cand_idx, cand_dist = saocat.find_stars_near_target(target, args.dist,
@@ -260,11 +307,16 @@ if __name__ == '__main__':
             if (hour_angle.degree > -meridian_thres.degree and force_side == 'EAST'):
                 logging.debug('Too far WEST for EAST contraint')
                 star_ok = False
+            if (abs(hour_angle.degree) > 6 * 15):
+                logging.debug('More than 6 hours from meridian!')
+                star_ok = False
 
             if not star_ok:
                 npier_exclude += 1
                 if True or args.verbose:
-                    logging.debug(f'Excluding star SAO{saocat.id[cat_idx]} due to pier side.')
+                    logging.debug(f'Excluding star SAO{saocat.id[cat_idx]} '
+                                  'due to pier side or more than 6 hours from '
+                                  'meridian.')
 
         if star_ok:
             nnear.append(len(cand_idx_2))
@@ -273,8 +325,8 @@ if __name__ == '__main__':
             if True or args.verbose:
                 logging.debug(f'Including star SAO{saocat.id[cat_idx]} ')
 
-        if args.verbose:
-            logging.info("")
+        # if args.verbose:
+        #     logging.info("")
 
     logging.debug(f'{nprox_exclude} stars excluded due to having close neighbors')
     logging.debug(f'{npier_exclude} stars excluded due to wrong pier side')
@@ -284,10 +336,11 @@ if __name__ == '__main__':
 
     if len(nnear) < 1:
         logging.error('No star found!')
-        logging.info(f'Writing output file {args.outfile}')
-        f = open(args.outfile, 'w')
-        f.write('nstars = 0\n')
-        f.close()
+
+        if args.outfile is not None:
+            logging.info(f'Writing output file {args.outfile}')
+            with open(args.outfile, 'w') as f:
+                f.write('nstars = 0\n')
         sys.exit(1)
 
     #distsort_idx = np.argsort(nnear)
@@ -341,20 +394,18 @@ if __name__ == '__main__':
     # if output file requested create it
     if args.outfile is not None:
         logging.info(f'Writing output file {args.outfile}')
-        f = open(args.outfile, 'w')
-        f.write(f'nstars = {len(distsort_idx)}\n')
-        f.write('#CatIdx,Distance (deg), SAO #, RA (J2000)), DEC (J2000),'
-                ' VMag, # near stars\n')
-        for i in range(0, len(distsort_idx)):
-            near_idx = distsort_idx[i]
-            cat_idx = nnear_idx[near_idx]
-            radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx],
-                             unit=u.deg, frame='fk5', equinox='J2000')
+        with open(args.outfile, 'w') as f:
+            f.write(f'nstars = {len(distsort_idx)}\n')
+            f.write('#CatIdx,Distance (deg), SAO #, RA (J2000)), DEC (J2000),'
+                    ' VMag, # near stars\n')
+            for i in range(0, len(distsort_idx)):
+                near_idx = distsort_idx[i]
+                cat_idx = nnear_idx[near_idx]
+                radec = SkyCoord(saocat.ra[cat_idx], saocat.dec[cat_idx],
+                                 unit=u.deg, frame='fk5', equinox='J2000')
 
-            f.write(f'{cat_idx}, {np.rad2deg(nnear_dist[near_idx])},'
-                    f' {saocat.id[cat_idx]},'
-                    f' {radec.ra.to_string(unit=u.hour, sep=":", precision=3)},'
-                    f' {radec.dec.to_string(unit=u.degree, sep=":", precision=3)},'
-                    f' {saocat.vmag[cat_idx]}, {nnear[near_idx]}\n')
-        f.flush()
-        f.close()
+                f.write(f'{cat_idx}, {np.rad2deg(nnear_dist[near_idx])},'
+                        f' {saocat.id[cat_idx]},'
+                        f' {radec.ra.to_string(unit=u.hour, sep=":", precision=3)},'
+                        f' {radec.dec.to_string(unit=u.degree, sep=":", precision=3)},'
+                        f' {saocat.vmag[cat_idx]}, {nnear[near_idx]}\n')

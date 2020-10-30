@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 # Autofocus on star
 #
@@ -423,8 +424,8 @@ def parse_commandline():
     parser.add_argument('--simul', action='store_true', help='Simulate star')
     parser.add_argument('--stayopen', action='store_true', help='stay open when done')
     parser.add_argument('--profile', type=str, help='Name of equipment profile')
-    parser.add_argument('--focuser', type=str,  help='Focuser Driver')
-    parser.add_argument('--camera', type=str,  help='Camera Driver')
+    parser.add_argument('--focuser', type=str,  help='Focuser Driver specified as BACKEND:DRIVER')
+    parser.add_argument('--camera', type=str,  help='Camera Driver specified as BACKEND:DRIVER')
     parser.add_argument('--exposure_start', default=3, type=float,  help='Starting exposure value')
     parser.add_argument('--exposure_min', default=1, type=float,  help='Minimum exposure value')
     parser.add_argument('--exposure_max', default=8, type=float,  help='Maximum exposure value')
@@ -545,7 +546,8 @@ if __name__ == '__main__':
             vcurve_rp = ap.settings.autofocus.get('vcurve_rp', None)
             vcurve_ls = ap.settings.autofocus.get('vcurve_ls', None)
             vcurve_lp = ap.settings.autofocus.get('vcurve_lp', None)
-            logging.debug(f'vcurve_rs,rp,ls,lp = {vcurve_rs} {vcurve_rp} {vcurve_ls} {vcurve_lp}')
+            logging.debug(f'vcurve_rs,rp,ls,lp = {vcurve_rs} {vcurve_rp} '
+                          f'{vcurve_ls} {vcurve_lp}')
             start_hfd = ap.settings.autofocus.get('start_hfd', None)
             near_hfd = ap.settings.autofocus.get('near_hfd', None)
             max_hfd = ap.settings.autofocus.get('max_hfd', None)
@@ -553,11 +555,31 @@ if __name__ == '__main__':
             final_offset = ap.settings.autofocus.get('final_offset', 0)
         else:
             logging.info(f'focuser specified = {args.focuser}')
-            focuser_backend, focuser_driver = args.focuser.split(':')
-            logging.info(f'focuser_backend = {focuser_backend} focuser_driver = {focuser_driver}')
+            if args.focuser is None:
+                logging.error('Need to specify focuser driver using --focuser!')
+                sys.exit(1)
+            focuser_backend, *focuser_driver = args.focuser.split(':')
+            if len(focuser_driver) != 1:
+                logging.error(f'Invalid focuser driver specification {args.focuser}!')
+                sys.exit(1)
+            else:
+                focuser_driver = focuser_driver[0]
+            logging.info(f'focuser_backend = {focuser_backend} '
+                         f'focuser_driver = {focuser_driver}')
+
             logging.info(f'camera specified = {args.camera}')
-            camera_backend, camera_driver = args.camera.split(':')
-            logging.info(f'camera_backend = {camera_backend} camera_driver = {camera_driver}')
+            if args.camera is None:
+                logging.error('Need to specify camera driver using --camera!')
+                sys.exit(1)
+            camera_backend, *camera_driver = args.camera.split(':')
+            if len(camera_driver) != 1:
+                logging.error(f'Invalid camera driver specification {args.camera}!')
+                sys.exit(1)
+            else:
+                camera_driver = camera_driver[0]
+            logging.info(f'camera_backend = {camera_backend} '
+                         f'camera_driver = {camera_driver}')
+
             FOCUSER_MIN_POS = args.focus_min
             FOCUSER_MAX_POS = args.focus_max
             FOCUSER_DIR = args.focus_dir

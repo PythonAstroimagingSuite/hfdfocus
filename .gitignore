@@ -15,3 +15,14 @@
 _templates
 _static
 _build
+.eggs
+.spyproject
+build
+docs/build
+hfdfocus.egg-info
+
+
+
+
+
+

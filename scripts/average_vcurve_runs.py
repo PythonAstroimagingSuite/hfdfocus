@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+#
 # average vcurve runs
 #
 # Copyright 2020 Michael Fulbright
