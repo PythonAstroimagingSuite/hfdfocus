@@ -839,7 +839,7 @@ if __name__ == '__main__':
     # compute location for desired Start HFD
     #initial_hfd = 24
     logging.debug(f'{fpos_1} {fpos_2} {fdir} {start_hfd} {hfd_2} {vslope}')
-    fpos_start = fpos_2 + fdir * int(abs((start_hfd - hfd_2) / vslope))
+    fpos_start = fpos_2 - fdir * int(abs((start_hfd - hfd_2) / vslope))
     logging.info(f'Start HFD = {start_hfd} pred focus = {fpos_start}')
 
     # figure out direction
