@@ -184,11 +184,11 @@ if __name__ == '__main__':
             force_side = args.onlyside
         elif args.currentside is not None:
             # compute current side using HA
-            hour_angle = (local_sidtime - target.ra)
+            hour_angle = (local_sidtime - target.ra).wrap_at('180d')
             logging.debug(f'target hour angle={hour_angle}')
             if abs(hour_angle.hour) > 6:
                 logging.error('Target is too far from meridian! '
-                              f'Hour angle = {hour_angle}.')
+                              f'Hour angle = {hour_angle}')
                 sys.exit(1)
             elif hour_angle < 0:
                 logging.debug('Target is in EAST')
