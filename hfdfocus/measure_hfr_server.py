@@ -25,7 +25,7 @@ import json
 import logging
 from queue import Empty, Queue
 from threading import Thread
-#from multiprocessing import Process, Queue
+from multiprocessing import Process  # , Queue
 from marshmallow import fields, Schema, ValidationError
 from marshmallow.validate import Range
 
@@ -34,7 +34,7 @@ import astropy.io.fits as pyfits
 from hfdfocus.StarFitHFR_RadialProfile import star_fit_hfr_radial_profile
 from hfdfocus.MultipleStarFitHFD import StarFitResult
 
-def setup_logging(debug=False):
+def _setup_logging(debug=False):
     LONG_FORMAT = '%(asctime)s.%(msecs)03d [%(filename)20s:%(lineno)3s ' \
                   + '%(funcName)20s() ] %(levelname)-8s %(message)s'
     SHORT_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
@@ -122,7 +122,7 @@ class MeasureHFRServer:
         self.queue.put(retstr)
 
     def run(self, request):
-        print('MeasureHFRServer run starting')
+        #print('MeasureHFRServer run starting')
 
         schema_d = dict(filename=fields.String(required=True),
                         request_id=fields.Integer(required=True),
@@ -174,11 +174,6 @@ class MeasureHFRServer:
                     #continue
 
                 logging.debug(f'MeasureHFRServer: result={result}')
-
-                with open(result['filename'], 'rb') as f:
-                    data=f.read()
-
-                print(len(data))
 
                 try:
                     logging.debug('MeasureHFRServer: opening fits {result["filename"]}')
@@ -256,42 +251,76 @@ class MeasureHFRClient(Thread):
             logging.debug('process done')
             logging.debug(f'process exitcode = {p.exitcode}')
 
+class MeasureHFRClientStdin:
+    def __init__(self):
+        """
+        Create client to call the server to measure hfr on an image.
 
-def fit(q, data):
-    logging.info('sleeping 5 sec')
-    time.sleep(5)
-    q.put(data+1)
+        Note: Only runs the first request and exits.
 
-def starfit(q, data):
-    infile = data
+        Listens to stdin for a JSON formatted request with the following fields:
+            filename: name of image file
+            request_id: unique integer value for this job
+            maxstars: max stars to prcess
+            bgfact: BG factor - higher means higher noise rejection
+            window: size in pixels of window used to analyze a star
 
-    hdu = pyfits.open(infile)
-    #print(hdu[0].data)
-    image_data = hdu[0].data.astype(float)
-    hdu.close()
-    starfit = star_fit_hfr_radial_profile(image_data,
-                                          max_stars=10,
-                                          debugplots=False,
-                                          debugfits=False)
-    q.put(starfit)
+        Will output a JSON response with format:
+            'Result':  'Success' or 'Error'
+            'Message': If error will have details.
+            'Value': JSON encoded results for stars detected.
+        """
+        super().__init__()
 
+    def run(self):
+        #logging.debug('MeasureHFRCientStdin run()')
+        #sys.stdout.write('waiting\n')
+        #sys.stdout.flush()
+        while True:
+            #logging.debug('waiting on job')
+            sys.stdout.write('waiting\n')
+            sys.stdout.flush()
+            for request in sys.stdin:
+                request = request.strip()
+                #logging.debug(f'request = |{request}|')
+                #sys.stdout.write(f'request = |{request}|\n')
+                #sys.stdout.flush()
 
-def wait_thread(q, data):
-    print('start wait_thread')
-    #p = Process(target=starfit, args=(queue, 'SH2-157-m14.0C-gain200-bin_1-300s-Ha-Light-0101.fits'))
-    rdict = dict(filename='SH2-157-m14.0C-gain200-bin_1-300s-Ha-Light-010.fits',
-                 request_id=10,
-                 maxstars=10)
-    rstr = json.dumps(rdict)
-    server = MeasureHFRServer(q, False)
-    logging.debug(f'rstr = {rstr}')
-    p = Process(target=server.run, args=(rstr,))
+                if request == "exit":
+                    sys.stdout.write('exiting\n')
+                    sys.stdout.flush()
+                    sys.exit(0)
 
-    print('start process')
-    p.start()
-    print('join process')
-    p.join() # this blocks until the process terminates
-    print('wait_thread done')
+                try:
+                    jdict = json.loads(request)
+                except json.JSONDecodeError:
+                    #logging.error(f'Invalid JSON passed: {request}')
+                    sys.stdout.write(json.dumps({'Result': 'Error',
+                                                 'Message': 'Invalid JSON'}))
+                    sys.stdout.write('\n')
+                    sys.stdout.flush()
+                    sys.exit(1)
+
+                #logging.debug(f'job data = {jdict}')
+                #sys.stdout.write(f'job data = {jdict}\n')
+                #sys.stdout.flush()
+
+                rstr = json.dumps(jdict)
+                #logging.debug(f'rstr = {rstr}')
+                result_queue = Queue()
+                s = MeasureHFRServer(result_queue, debug=False)
+                #logging.debug('start process')
+                s.run(rstr)
+                stars = result_queue.get()
+                sys.stdout.write(f'{stars}\n')
+                sys.stdout.flush()
+
+                time.sleep(10)
+                sys.stdout.write('done\n')
+                sys.stdout.flush()
+
+                sys.exit(0)
+
 
 
 if __name__ == '__main__':
@@ -319,7 +348,7 @@ if __name__ == '__main__':
 
 
 
-    setup_logging((args.debug))
+    _setup_logging((args.debug))
 
     job_queue = Queue()
     result_queue = Queue()
