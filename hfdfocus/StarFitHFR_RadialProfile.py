@@ -257,19 +257,78 @@ def star_fit_hfr_radial_profile(image_data, max_stars=100,
                                       bgfact=bgfact,
                                       debugplots=debugplots,
                                       debugfits=debugfits)
-
+    logging.debug(f'detected = {detected}')
+    ht, wd = image_data.shape
     if detected is not None:
         star_cx = np.array([x.cx for x in detected.stars])
         star_cy = np.array([x.cy for x in detected.stars])
         star_r1 = np.array([x.r1 for x in detected.stars])
         star_r2 = np.array([x.r2 for x in detected.stars])
-        star_angle = np.array([x.angle for x in detected.stars])
+        # if angle is returned as None like some routines do then
+        # convert to nan
+        star_angle = np.array([x.angle for x in detected.stars], dtype=float)
         star_f = np.array([x.flux for x in detected.stars])
-        print(star_cx)
-        ht, wd = image_data.shape
+        #print(star_cx)
         result = StarFitResult(star_cx, star_cy, star_r1, star_r2, star_angle,
                                star_f, len(star_cx), 0, 0, wd, ht)
     else:
-        result = None
-
+        #result = None
+        result = StarFitResult([], [], [], [], [], [], 0, 0, 0, wd, ht)
     return result
+
+
+if __name__ == '__main__':
+    import argparse
+
+    LONG_FORMAT = '%(asctime)s.%(msecs)03d [%(filename)20s:%(lineno)3s ' \
+                  + '%(funcName)20s() ] %(levelname)-8s %(message)s'
+    SHORT_FORMAT = '%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
+
+    logging.basicConfig(filename='StarFitHFR_RadialProfile.log',
+                        filemode='w',
+                        level=logging.DEBUG,
+                        format='%(asctime)s %(levelname)-8s %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+
+    # add to screen as well
+    log = logging.getLogger()
+    formatter = logging.Formatter(SHORT_FORMAT)  # '%(asctime)s %(levelname)-8s %(message)s')
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+    log.addHandler(ch)
+
+    #test_1d_with_gaussian()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('infile', type=str, help='Target')
+    parser.add_argument('--bgfact', type=int, default=50, help='BG Factor')
+    parser.add_argument('--maxstars', type=int, default=500, help='Max stars detected')
+    parser.add_argument('--window', type=int, default=7, help='Star detection window (pixels)')
+    parser.add_argument('--debugplots', action='store_true', help='show debug plots')
+    parser.add_argument('--debugfits', action='store_true', help='dump debug images')
+    parser.add_argument('--debug', action='store_true', help='show debug info')
+
+    args = parser.parse_args()
+
+    if args.debug:
+        ch.setLevel(logging.DEBUG)
+
+#    logging.info(f'command args = {args}')
+
+    infile = args.infile
+
+    hdu = pyfits.open(infile)
+    #print(hdu[0].data)
+    image_data = hdu[0].data.astype(float)
+    hdu.close()
+
+    starfit = star_fit_hfr_radial_profile(image_data,
+                                          max_stars=args.maxstars,
+                                          bgfact=args.bgfact,
+                                          window=args.window,
+                                          debugplots=args.debugplots,
+                                          debugfits=args.debugfits)
+
+    if args.debugplots:
+        plt.pause(1000)
+

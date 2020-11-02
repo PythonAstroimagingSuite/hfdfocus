@@ -4,7 +4,7 @@
 #
 # NOTE: Code is duplicated and refactored from StarFitHFD.py - decided it was
 #       better to star over and design it better and leave the existing
-#       single star code alone for now as it is used only by autofocus and
+#       single start code alone for now as it is used only by autofocus and
 #       is working really well!
 #
 # Copyright 2020 Michael Fulbright
@@ -41,9 +41,9 @@ import astropy.io.fits as pyfits
 # for testing
 import matplotlib as mpl
 #mpl.use("Qt5agg")
-print(mpl.get_backend())
+#print(mpl.get_backend())
 mpl.use("TkAgg")
-print(mpl.get_backend())
+#print(mpl.get_backend())
 #mpl.rcParams['toolbar'] = 'None'
 #mpl.rc('font', size=8)
 import matplotlib.pyplot as plt
@@ -58,8 +58,16 @@ class StarFitResult:
         self.star_cy = star_cy
         self.star_r1 = star_r1
         self.star_r2 = star_r2
+
+        logging.debug(f'star_r1 = {self.star_r1}')
+        logging.debug(f'star_r2 = {self.star_r2}')
+
         # create a equiv radius for plotting
-        self.star_r = np.sqrt(star_r1 * star_r2)
+        if (self.star_r1 is not None and self.star_r2 is not None
+            and len(self.star_r1) > 0 and len(self.star_r2) > 0):
+            self.star_r = np.sqrt(star_r1 * star_r2)
+        else:
+            self.star_r = []
         self.star_angle = star_angle
         self.star_f = star_f
         self.nstars = nstars
@@ -144,6 +152,26 @@ class StarFitResult:
                              self.noiseest,
                              self.width,
                              self.height)
+
+    def __repr__(self):
+        s = 'StarFitResult:\n' \
+            + f'   nstars   = {self.nstars}\n' \
+            + f'   width    = {self.width}\n' \
+            + f'   height   = {self.height}\n' \
+            + f'   bgest    = {self.bgest}\n' \
+            + f'   noiseest = {self.noiseest}\n'
+
+        s += '\n'
+        s += '   Star #     CX       CY      R1     R2   ANGLE      FLUX\n'
+        s += '   ======  =======  =======   ====   ====  =====   ==========\n'
+        for i in range(self.nstars):
+            s += f'   {i+1: 5d}: ' \
+                 + f'{self.star_cx[i]: 8.2f} {self.star_cy[i]: 8.2f} ' \
+                 + f'{self.star_r1[i]: 6.2f} {self.star_r2[i]: 6.2f} ' \
+                 + f'{self.star_angle[i]: 6.2f} {self.star_f[i]: 12.2f}\n'
+
+        return s
+
 
 @dataclass
 class StarInfo:
@@ -1107,7 +1135,7 @@ def measure_stars_in_image(image_data, star_fit_fn, max_stars=100, bgfact=50,
 
         idx = 0
         for star in detected.stars[star_range]:
-            print(star)
+            #print(star)
             logging.debug(f'idx {idx}: cx={star.cx:5.3f} cy={star.cy:5.3f} '
                           f'size={star.estsize:5.3f} r1={star.r1:6.3f} '
                           f'r2={star.r2:6.3f} angle={star.angle:4.1f} '
@@ -1134,7 +1162,7 @@ def star_fit_hfr(image_data, max_stars=100, bgfact=50, satur=50000, window=7,
         star_r2 = np.array([x.r2 for x in detected.stars])
         star_angle = np.array([x.angle for x in detected.stars])
         star_f = np.array([x.flux for x in detected.stars])
-        print(star_cx)
+        #print(star_cx)
         ht, wd = image_data.shape
         result = StarFitResult(star_cx, star_cy, star_r1, star_r2, star_angle,
                                star_f, len(star_cx), 0, 0, wd, ht)
